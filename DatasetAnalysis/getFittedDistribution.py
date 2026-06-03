@@ -3,12 +3,14 @@ import pandas as pd
 import scipy.stats as st
 from scipy.optimize import minimize
 
+#CSV file and column to analyze
 DATA_FILE = "OrderDataset(Mapped).csv"
 TARGET_COL = "MappedDepartment"
 
 print("Loading dataset...")
 df = pd.read_csv(DATA_FILE, usecols=[TARGET_COL])
 
+#get frequencies of each department (item type)
 print("Calculating department frequencies...")
 counts = df[TARGET_COL].dropna().value_counts()
 frequencies = counts.values
@@ -18,10 +20,12 @@ if len(frequencies) < 2:
     print("Error: Need at least 2 unique departments to run the fit.")
     exit()
 
+#get ranks and shares for fitting
 ranks = np.arange(1, len(frequencies) + 1)
 idx_array = np.arange(0, len(frequencies))
 shares = frequencies / np.sum(frequencies)
 
+#calculates department distribution and fits to Zipf
 def fit_zipf(actual_shares, ranks):
     """Find best alpha parameter for Zipf's Law."""
     def objective(alpha):
@@ -34,6 +38,7 @@ def fit_zipf(actual_shares, ranks):
     opt_res = minimize(objective, x0=[1.5], bounds=[(1.001, 10)])
     return opt_res.x[0]
 
+#calculates department distribution and fits to geometric
 def fit_geometric(actual_shares, ranks):
     """Find best p parameter for Geometric decay."""
     def objective(p):
@@ -46,6 +51,7 @@ def fit_geometric(actual_shares, ranks):
     opt_res = minimize(objective, x0=[0.3], bounds=[(0.001, 0.999)])
     return opt_res.x[0]
 
+#calculates department distribution and fits to poisson
 def fit_poisson(actual_shares, idxs):
     """Find best lambda parameter for Poisson."""
     def objective(lam):
@@ -63,7 +69,7 @@ def fit_poisson(actual_shares, idxs):
 print("Optimizing curve parameters...")
 models = {}
 
-# Zipf curve configuration
+# calculate Zipf curve configuration
 alpha_best = fit_zipf(shares, ranks)
 zipf_vals = 1 / (ranks ** alpha_best)
 models["Zipf"] = {
@@ -87,6 +93,8 @@ models["Poisson"] = {
     "config": f"Poisson(λ={lam_best:.2f})"
 }
 table_data = []
+
+# Analyze which model best fits each department's share and print result table
 for idx, name in enumerate(departments):
     actual = shares[idx]
     row_errors = {m_name: abs(actual - m_data["array"][idx]) for m_name, m_data in models.items()}
