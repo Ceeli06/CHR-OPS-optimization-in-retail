@@ -1,2 +1,2 @@
-# Will include functions for setup of large, medium, and small store layouts
+# Will include simulation constants and functions for setup of large, medium, and small store layouts
 
