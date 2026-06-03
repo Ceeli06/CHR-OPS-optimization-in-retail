@@ -21,12 +21,12 @@ categoryMapping = {
     7: "Cleaning",
     8: "Toys",
     9: "Pets",
-    10: "Electronics",
-    11: "Garden",
-    12: "Home Improvement",
-    13: "Auto",
-    14: "Sports & Outdoors",
-    15: "Arts & Crafts",
+    "A": "Electronics",
+    "B": "Garden",
+    "C": "Home Improvement",
+    "D": "Auto",
+    "E": "Sports & Outdoors",
+    "F": "Arts & Crafts",
     "N": "Empty",
     "S": "Staging"
 }
