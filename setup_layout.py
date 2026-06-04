@@ -1,14 +1,5 @@
 # Will include functions for setup of large, medium, and small store layouts
 
-#large function
-# what we want to do:
-
-
-#params:
-#numpeople, numrobots, sizeofstore, sizeoforders, numtotalorders, custumor disruption percentage
-# constants: freezer perishable time (30m), order due time (4hr), walking speed (1m/s), 
-# break time (30 min break in mid of shift), shift schedule (6-2pm, 2-10pm), charging/downtime for AMR, AMR speed 
-
 import numpy as np
 from collections import defaultdict
 
