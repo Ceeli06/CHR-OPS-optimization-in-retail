@@ -1,4 +1,5 @@
-# Will include functions for setup of large, medium, and small store layouts
+# Includes functions for grabbing large, medium, and small store layouts from file input
+# Includes mapping function to create dictionary of aisle -> coordinates, which will be used for order generation
 
 import numpy as np
 from collections import defaultdict
@@ -55,12 +56,5 @@ def setup_small():
         small_layout = f.read() 
         return layout_to_array(small_layout)
     
-large_layout = setup_large()
-medium_layout = setup_medium()
-small_layout = setup_small()
 
-print("Large Layout: ", large_layout)
-print("Medium Layout: ", medium_layout)
-print("Small Layout: ", small_layout)
-print("Freezer items: ", map_of_coords(small_layout))
 
