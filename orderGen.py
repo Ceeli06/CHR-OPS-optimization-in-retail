@@ -2,13 +2,13 @@ import json
 import os
 import random
 import copy
-from setup_layout import CATEGORYMAPPING, map_of_coords, setup_small
+from setup_layout import CATEGORYMAPPING, map_of_coords, setup_large
 
 BASE_DIR = os.path.dirname(__file__)
 DATASET_DIR = os.path.join(BASE_DIR, "DatasetAnalysis")
 
 orders_path = os.path.join(DATASET_DIR, "orders.json")
-random.seed(12) # keeps randomization constant
+random.seed(121233) # keeps randomization constant
 
 with open(orders_path, "r") as f:
     orders = json.load(f)
@@ -28,8 +28,8 @@ def generate_order(coord_map):
     order = generate_order_helper()
     order_set = order['items']
     print(order_set)
+    list = []
     for items in order_set:
-        list = []
         dep = items['department']
         quantity = items['quantity']
         dep_num = str(CATEGORYMAPPING[dep])
@@ -38,6 +38,7 @@ def generate_order(coord_map):
             possible_cords = coord_map[dep_num]
             x = random.randint(0, len(possible_cords) - 1)
             list.append(possible_cords[x])
+
     print(list)
 
     return {
@@ -47,6 +48,6 @@ def generate_order(coord_map):
     }
             
 
-small = setup_small()
-map = map_of_coords(small)
+large = setup_large()
+map = map_of_coords(large)
 generate_order(map)
