@@ -39,15 +39,45 @@ def generate_order(coord_map):
             x = random.randint(0, len(possible_cords) - 1)
             list.append(possible_cords[x])
 
-    print(list)
-
     return {
         "visit_id": order['visit_id'],
         "items": order['items'],
         "coords": list
     }
+
+def convert_coords(grid, coords):
+    rows, cols = len(grid), len(grid[0])
+
+    directions = [
+        (-1, 0),  # up
+        (1, 0),   # down
+        (0, -1),  # left
+        (0, 1),   # right
+    ]
+
+    converted = []
+
+    for r, c in coords:
+        found = False
+
+        for dr, dc in directions:
+            nr, nc = r + dr, c + dc
+
+            if 0 <= nr < rows and 0 <= nc < cols:
+                if grid[nr][nc] == '.':
+                    converted.append((nr, nc))
+                    found = True
+                    break
+
+        if not found:
+            raise ValueError(f"No adjacent walkable cell for {(r, c)}")
+
+    return converted
             
 
 large = setup_large()
 map = map_of_coords(large)
-generate_order(map)
+aisle_coords = generate_order(map)["coords"]
+real_coords = convert_coords(large, aisle_coords)
+print(aisle_coords)
+print(real_coords)
