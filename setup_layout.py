@@ -132,10 +132,29 @@ def nearest_neighbor(orders, dist_map, staging):
 
     return path
 
+def path_distance(path, dist_map):
+    total = 0
+
+    for i in range(len(path) - 1):
+        start = path[i]
+        end = path[i + 1]
+
+        d = dist_map[start][end[0], end[1]]
+        total += d
+
+    return total
+
 small = setup_small()
 dist_map = all_distance_maps(small)
 coord_map = map_of_coords(small)
 staging = coord_map["S"][0]
-route = nearest_neighbor([(1,1), (2,2), (3,3), (2,30), (6,70), (2,4), (5,80), (6,2)], dist_map, staging)
+# connect below orders w/ order generation logic
+orders = [
+    (1,1),
+    (2,2),
+    (3,3)
+]
+route = nearest_neighbor(orders, dist_map, staging)
 route.append(staging)
 print(route)
+print("dist: ", path_distance(route, dist_map))
