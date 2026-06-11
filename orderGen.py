@@ -2,13 +2,13 @@ import json
 import os
 import random
 import copy
-from setup_layout import CATEGORYMAPPING, map_of_coords, setup_small
+from setup_layout import CATEGORYMAPPING
 
 BASE_DIR = os.path.dirname(__file__)
 DATASET_DIR = os.path.join(BASE_DIR, "DatasetAnalysis")
 
 orders_path = os.path.join(DATASET_DIR, "orders.json")
-random.seed(12) # keeps randomization constant
+random.seed(12)  # keeps randomization constant
 
 with open(orders_path, "r") as f:
     orders = json.load(f)
@@ -24,29 +24,64 @@ def generate_order_helper():
         "items": order
     }
 
-def generate_order(coord_map):
+# Creates explicit item coordinates for one order
+# based on department mapping and quantity.
+def generate_order_coords(items, coord_map):
+    coords = []
+
+    for item in items:
+        department = item["department"]
+        quantity = item["quantity"]
+        mapped_department = CATEGORYMAPPING.get(department)
+
+        if mapped_department is None:
+            raise KeyError(f"Department mapping not found for '{department}'")
+
+        possible_coords = coord_map.get(str(mapped_department), [])
+        if not possible_coords:
+            raise ValueError(
+                f"No coordinates found for department '{department}' mapped to '{mapped_department}'"
+            )
+
+        for _ in range(quantity):
+            coords.append(random.choice(possible_coords))
+
+    return coords
+
+# Builds a single order record with an optional arrival time.
+def generate_order(coord_map, arrival_time=None):
     order = generate_order_helper()
-    order_set = order['items']
-    print(order_set)
-    for items in order_set:
-        list = []
-        dep = items['department']
-        quantity = items['quantity']
-        dep_num = str(CATEGORYMAPPING[dep])
-        
-        for i in range(quantity):
-            possible_cords = coord_map[dep_num]
-            x = random.randint(0, len(possible_cords) - 1)
-            list.append(possible_cords[x])
-    print(list)
+    coords = generate_order_coords(order["items"], coord_map)
 
     return {
-        "visit_id": order['visit_id'],
-        "items": order['items'],
-        "coords": list
+        "visit_id": order["visit_id"],
+        "items": order["items"],
+        "coords": coords,
+        "arrival_time": arrival_time,
     }
-            
 
-small = setup_small()
-map = map_of_coords(small)
-generate_order(map)
+# Creates a list of arrival times for a Poisson process.
+def generate_order_arrival_times(sim_time, arrival_rate):
+    times = []
+    current_time = 0.0
+
+    while True:
+        interarrival = random.expovariate(arrival_rate)
+        current_time += interarrival
+        if current_time >= sim_time:
+            break
+        times.append(current_time)
+
+    return times
+
+# Generates orders for the simulation horizon.
+def generate_orders(coord_map, sim_time, arrival_rate):
+    arrival_times = generate_order_arrival_times(sim_time, arrival_rate)
+    orders_list = []
+
+    for order_id, arrival_time in enumerate(arrival_times):
+        order = generate_order(coord_map, arrival_time=arrival_time)
+        order["order_id"] = order_id
+        orders_list.append(order)
+
+    return orders_list

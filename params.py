@@ -13,3 +13,7 @@ AMR_LOAD_TIME = 10 # seconds to load an item onto the AMR = 10 seconds
 AMR_UNLOAD_TIME = 10 # seconds to unload an item from the AMR = 10 seconds
 AMR_CAPACITY = 10 # maximum number of items an AMR can carry = 10 items
 AMR_SPEED = 1.5 # AMR movement speed = 1.5 meters per second
+ORDER_ARRIVAL_RATE = 1 / 300.0 # average number of orders per second (1/lambda)
+BATCH_SIZE_MIN = 6 
+BATCH_SIZE_MAX = 8
+SIM_TIME = 8 * 60 * 60 # Simulates 8 hour workday

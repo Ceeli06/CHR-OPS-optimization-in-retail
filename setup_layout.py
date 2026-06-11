@@ -11,6 +11,7 @@ CATEGORYMAPPING = {
     "Perishable Grocery": 2,
     "Health & Beauty": 3,
     "Misc.": 4,
+    "Miscellaneous": 4,
     "Fashion": 5,
     "Home": 6,
     "Cleaning": 7,
@@ -78,7 +79,7 @@ def distance_map(grid, start):
             if (
                 0 <= nr < rows and
                 0 <= nc < cols and
-                (grid[nr, nc] == "." or grid[nr,nc] == "S") and
+                grid[nr, nc] != "" and  # Allow all non-empty grid cells (walking and items)
                 dist[nr, nc] == -1
             ):
                 dist[nr, nc] = dist[r, c] + 1
@@ -93,8 +94,7 @@ def all_distance_maps(grid):
 
     for r in range(rows):
         for c in range(cols):
-            if grid[r, c] == "." or "S":
-                result[(r, c)] = distance_map(grid, (r, c))
+            result[(r, c)] = distance_map(grid, (r, c))
 
     return result
 
@@ -143,18 +143,3 @@ def path_distance(path, dist_map):
         total += d
 
     return total
-
-small = setup_small()
-dist_map = all_distance_maps(small)
-coord_map = map_of_coords(small)
-staging = coord_map["S"][0]
-# connect below orders w/ order generation logic
-orders = [
-    (1,1),
-    (2,2),
-    (3,3)
-]
-route = nearest_neighbor(orders, dist_map, staging)
-route.append(staging)
-print(route)
-print("dist: ", path_distance(route, dist_map))
