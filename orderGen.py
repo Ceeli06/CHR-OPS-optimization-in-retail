@@ -11,8 +11,8 @@ BASE_DIR = os.path.dirname(__file__)
 DATASET_DIR = os.path.join(BASE_DIR, "DatasetAnalysis")
 orders_path = os.path.join(DATASET_DIR, "orders.json")
 
-# Fixing random seed
-random.seed(120)
+# Fixed random seed for order sets
+random.seed(12)
 
 # Load all orders from JSON dataset
 with open(orders_path, "r") as f:
