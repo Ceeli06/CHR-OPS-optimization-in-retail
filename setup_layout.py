@@ -7,22 +7,22 @@ from collections import defaultdict, deque
 # Key for understanding .txt file to layout conversion
 # . is walking space
 CATEGORYMAPPING = {
-    1: "Grocery",
-    2: "Perishable Grocery",
-    3: "Health & Beauty",
-    4: "Misc.",
-    5: "Fashion",
-    6: "Home",
-    7: "Cleaning",
-    8: "Toys",
-    9: "Pets",
-    "A": "Electronics",
-    "B": "Garden",
-    "C": "Home Improvement",
-    "D": "Auto",
-    "E": "Sports & Outdoors",
-    "F": "Arts & Crafts",
-    "S": "Staging"
+    "Grocery": 1,
+    "Perishable Grocery": 2,
+    "Health & Beauty": 3,
+    "Misc.": 4,
+    "Fashion": 5,
+    "Home": 6,
+    "Cleaning": 7,
+    "Toys": 8,
+    "Pets": 9,
+    "Electronics": "A",
+    "Garden": "B",
+    "Home Improvement": "C",
+    "Auto": "D",
+    "Sports & Outdoors": "E",
+    "Arts & Crafts": "F",
+    "Staging": "S"
 }
 
 # Converts layout from string to a 2D array
