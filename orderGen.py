@@ -2,13 +2,13 @@ import json
 import os
 import random
 import copy
-from setup_layout import CATEGORYMAPPING, map_of_coords, setup_small
+from setup_layout import CATEGORYMAPPING, map_of_coords, setup_large
 
 BASE_DIR = os.path.dirname(__file__)
 DATASET_DIR = os.path.join(BASE_DIR, "DatasetAnalysis")
 
 orders_path = os.path.join(DATASET_DIR, "orders.json")
-random.seed(12) # keeps randomization constant
+random.seed(121233) # keeps randomization constant
 
 with open(orders_path, "r") as f:
     orders = json.load(f)
@@ -28,8 +28,8 @@ def generate_order(coord_map):
     order = generate_order_helper()
     order_set = order['items']
     print(order_set)
+    list = []
     for items in order_set:
-        list = []
         dep = items['department']
         quantity = items['quantity']
         dep_num = str(CATEGORYMAPPING[dep])
@@ -38,15 +38,46 @@ def generate_order(coord_map):
             possible_cords = coord_map[dep_num]
             x = random.randint(0, len(possible_cords) - 1)
             list.append(possible_cords[x])
-    print(list)
 
     return {
         "visit_id": order['visit_id'],
         "items": order['items'],
         "coords": list
     }
+
+def convert_coords(grid, coords):
+    rows, cols = len(grid), len(grid[0])
+
+    directions = [
+        (-1, 0),  # up
+        (1, 0),   # down
+        (0, -1),  # left
+        (0, 1),   # right
+    ]
+
+    converted = []
+
+    for r, c in coords:
+        found = False
+
+        for dr, dc in directions:
+            nr, nc = r + dr, c + dc
+
+            if 0 <= nr < rows and 0 <= nc < cols:
+                if grid[nr][nc] == '.':
+                    converted.append((nr, nc))
+                    found = True
+                    break
+
+        if not found:
+            raise ValueError(f"No adjacent walkable cell for {(r, c)}")
+
+    return converted
             
 
-small = setup_small()
-map = map_of_coords(small)
-generate_order(map)
+large = setup_large()
+map = map_of_coords(large)
+aisle_coords = generate_order(map)["coords"]
+real_coords = convert_coords(large, aisle_coords)
+print(aisle_coords)
+print(real_coords)

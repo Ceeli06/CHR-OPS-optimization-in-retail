@@ -10,7 +10,7 @@ CATEGORYMAPPING = {
     "Grocery": 1,
     "Perishable Grocery": 2,
     "Health & Beauty": 3,
-    "Misc.": 4,
+    "Miscellaneous": 4,
     "Fashion": 5,
     "Home": 6,
     "Cleaning": 7,
