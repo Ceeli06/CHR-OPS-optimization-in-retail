@@ -21,6 +21,9 @@ class Order:
     pick_start_time: float = None  # When picker first touches this order's items
     completion_time: float = None  # When all items are picked
 
+    perishable_coords: set = None  # Coords belonging to this order's perishable items
+    perishable_picked_at: float = None  # When a perishable item was picked
+
 
 # A human store associate who picks orders
 @dataclass
@@ -195,6 +198,20 @@ class Simulation:
     def select_picker(self):
         return min(self.pickers, key=lambda p: p.available_time)
 
+    # Determine which of an order's coords belong to its perishable items
+    # (mirrors orderGen.generate_order_coords' per-item quantity expansion)
+    def perishable_coords_for_order(self, order):
+        coords_iter = iter(order.coords)
+        perishable_coords = set()
+        for item in order.items:
+            quantity = item.get("quantity", 1)
+            is_perishable_item = str(item.get("department", "")).lower().find("perishable") >= 0
+            for _ in range(quantity):
+                coord = next(coords_iter)
+                if is_perishable_item:
+                    perishable_coords.add(coord)
+        return perishable_coords
+
     # Build a nearest-neighbor route for the batch from staging through all item locations and back
     def build_route(self, orders):
         coords = []
@@ -247,6 +264,8 @@ class Simulation:
                 str(item.get("department", "")).lower().find("perishable") >= 0
                 for item in order.items
             )
+            order.perishable_coords = self.perishable_coords_for_order(order)
+            order.perishable_picked_at = None
             for coord in order.coords:
                 coord_orders.setdefault(coord, []).append(order)
 
@@ -268,6 +287,9 @@ class Simulation:
             for order in seen_orders.values(): # For each item in "seen orders"
                 if order.pick_start_time is None:
                     order.pick_start_time = time_cursor - pick_duration
+                if (order.is_perishable and order.perishable_picked_at is None
+                        and node in order.perishable_coords):
+                    order.perishable_picked_at = time_cursor - pick_duration
                 decrement = sum(1 for coord in order.coords if coord == node)
                 order.items_remaining -= decrement # Decrement items remaining in batch
                 if order.items_remaining <= 0 and order.completion_time is None:
@@ -294,7 +316,12 @@ class Simulation:
                 order.completion_time = self.time
             self.metrics.record_completion(order)
             if order.is_perishable:
-                start_time = order.pick_start_time if order.pick_start_time is not None else order.arrival_time
+                if order.perishable_picked_at is not None:
+                    start_time = order.perishable_picked_at
+                elif order.pick_start_time is not None:
+                    start_time = order.pick_start_time
+                else:
+                    start_time = order.arrival_time
                 self.metrics.perishable_exposure.append(order.completion_time - start_time)
 
         # Schedule next batch if enough orders
