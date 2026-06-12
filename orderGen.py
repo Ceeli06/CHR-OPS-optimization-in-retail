@@ -1,83 +1,90 @@
+# Provided realistic order generation based on Walmart historical trip data
+
 import json
 import os
 import random
 import copy
-from setup_layout import CATEGORYMAPPING, map_of_coords, setup_large
+from setup_layout import CATEGORYMAPPING
 
+# Get and set the directory path for historical order dataset
 BASE_DIR = os.path.dirname(__file__)
 DATASET_DIR = os.path.join(BASE_DIR, "DatasetAnalysis")
-
 orders_path = os.path.join(DATASET_DIR, "orders.json")
-random.seed(121233) # keeps randomization constant
 
+# Fixed random seed for order sets
+random.seed(12)
+
+# Load all orders from JSON dataset
 with open(orders_path, "r") as f:
-    orders = json.load(f)
-    order_keys = list(orders.keys())
+    orders = json.load(f)  # Dict mapping order IDs to items
+    order_keys = list(orders.keys())  # List of all order IDs
 
-# returns a dictionary entry of an order
-def generate_order_helper():
+# Picks a random order and returns it as a dict with order id 
+#                           and items in order as a list of {dept, qty}
+def generate_order_helper(): 
     visit_id = random.choice(order_keys)
-    order = copy.deepcopy(orders[visit_id])
-
+    order = copy.deepcopy(orders[visit_id]) # Use deepcopy to not modify orginal
     return {
         "visit_id": visit_id,
         "items": order
     }
 
-def generate_order(coord_map):
+# Gets and returns a list of coordinates for each item in an order
+def generate_order_coords(items, coord_map):
+    coords = []
+    for item in items:
+        department = item["department"]
+        quantity = item["quantity"]
+        # Convert dept name to grid symbol (e.g., "Grocery" -> "1")
+        mapped_department = CATEGORYMAPPING.get(department)
+        if mapped_department is None:
+            raise KeyError(f"Department mapping not found for '{department}'")
+        possible_coords = coord_map.get(str(mapped_department), [])
+        if not possible_coords:
+            raise ValueError(
+                f"No coordinates found for department '{department}' mapped to '{mapped_department}'"
+            )
+        # For each item, pick a random location in that department
+        for _ in range(quantity):
+            coords.append(random.choice(possible_coords))
+    return coords
+
+# Generate random order arrival times using a Poisson process (with exponential inter arrival times)
+def generate_order_arrival_times(sim_time, arrival_rate):
+    times = []
+    current_time = 0.0 # Gen. at start of sim
+
+    while True:
+        interarrival = random.expovariate(arrival_rate) # Gen. random interarrival time
+        current_time += interarrival # Arrival time = current time + generated int.arr. time
+
+        if current_time >= sim_time: # If end of sim reached, break
+            break
+
+        times.append(current_time) # Append Arrival time to list
+
+    return times # Return all arrival times of entire sim
+
+# Generates a complete order with items, store coordinates, and arrival time
+def generate_order(coord_map, arrival_time=None):
     order = generate_order_helper()
-    order_set = order['items']
-    print(order_set)
-    list = []
-    for items in order_set:
-        dep = items['department']
-        quantity = items['quantity']
-        dep_num = str(CATEGORYMAPPING[dep])
-        
-        for i in range(quantity):
-            possible_cords = coord_map[dep_num]
-            x = random.randint(0, len(possible_cords) - 1)
-            list.append(possible_cords[x])
+    coords = generate_order_coords(order["items"], coord_map)
 
     return {
-        "visit_id": order['visit_id'],
-        "items": order['items'],
-        "coords": list
+        "visit_id": order["visit_id"],
+        "items": order["items"],
+        "coords": coords,
+        "arrival_time": arrival_time,
     }
 
-def convert_coords(grid, coords):
-    rows, cols = len(grid), len(grid[0])
+# Generate all orders for the entire simulation, sorted by arrival time as a list
+def generate_orders(coord_map, sim_time, arrival_rate):
+    arrival_times = generate_order_arrival_times(sim_time, arrival_rate)
+    orders_list = []
 
-    directions = [
-        (-1, 0),  # up
-        (1, 0),   # down
-        (0, -1),  # left
-        (0, 1),   # right
-    ]
+    for order_id, arrival_time in enumerate(arrival_times):
+        order = generate_order(coord_map, arrival_time=arrival_time)
+        order["order_id"] = order_id
+        orders_list.append(order)
 
-    converted = []
-
-    for r, c in coords:
-        found = False
-
-        for dr, dc in directions:
-            nr, nc = r + dr, c + dc
-
-            if 0 <= nr < rows and 0 <= nc < cols:
-                if grid[nr][nc] == '.':
-                    converted.append((nr, nc))
-                    found = True
-                    break
-
-        if not found:
-            raise ValueError(f"No adjacent walkable cell for {(r, c)}")
-
-    return converted
-            
-
-large = setup_large()
-map = map_of_coords(large)
-aisle_coords = generate_order(map)["coords"]
-real_coords = convert_coords(large, aisle_coords)
-print(aisle_coords)
-print(real_coords)
+    return orders_list
