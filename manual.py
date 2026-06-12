@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from orderGen import generate_orders
 from setup_layout import setup_medium, map_of_coords, nearest_neighbor, path_distance, all_distance_maps
 
+# Orders waiting longer than this are forceed into the next batch
+SIMILARITY_BATCH_MAX_WAIT = 90 * 60  # 1.5 hours
 
 # A customer order with items to be picked from the store
 @dataclass
@@ -86,10 +88,10 @@ class Metrics:
 
     # Record a completed order's comp.time and check if it missed the due time
     def record_completion(self, order: Order):
-        completion_delay = (order.completion_time - order.arrival_time) + params.STAGING_TIME
-        self.completion_times.append(completion_delay)
+        final_completion_time = (order.completion_time - order.arrival_time) + params.STAGING_TIME
+        self.completion_times.append(final_completion_time)
 
-        if completion_delay > params.ORDER_DUE_TIME:
+        if final_completion_time > params.ORDER_DUE_TIME:
             self.late_orders += 1
 
         self.total_orders += 1
@@ -191,14 +193,68 @@ class Simulation:
         if self.pending_orders:
             self.schedule(self.time, "BATCH_DISPATCH", {"final": True})
 
-    # Pull orders off the pending queue up to BATCH_SIZE_MAX for the given, free picker
+    # Helper that returns a set of all department names in an order
+    def department_set(self, order):
+        return {
+            str(item.get("department", "")).lower()
+            for item in order.items
+        }
+
+    # Gets Jaccard similarity of two order's department sets (0 = completely different, 1 = identical)
+    def order_similarity(self, a, b):
+        depts_a = self.department_set(a)
+        depts_b = self.department_set(b)
+        union = depts_a | depts_b
+        if not union:
+            return 0.0
+        return len(depts_a & depts_b) / len(union)
+
+    # Adds orders to batch starting with oldest order in queue, then any orders waiting over
+    # SIMILARITY_BATCH_MAX_WAIT, then uses Jaccard helper to greedily select remaining orders
+    # Returning slected and the remaining orders (in the same sequence as before)
+    def select_similar_batch(self, batch_size):
+        if batch_size >= len(self.pending_orders):
+            return list(self.pending_orders), []
+
+        selected_indices = {0}  # Seed = oldest order (index 0), always included
+        seed = self.pending_orders[0]
+
+        # Force-include any order that has waited too long starting with oldest
+        for i in range(1, len(self.pending_orders)):
+            if len(selected_indices) >= batch_size:
+                break
+            order = self.pending_orders[i]
+            if self.time - order.arrival_time >= SIMILARITY_BATCH_MAX_WAIT:
+                selected_indices.add(i)
+
+        # Greedily fill remaining slots via. Jaccard with orders most similar to the first order (seed)
+        remaining_indices = [
+            i for i in range(1, len(self.pending_orders))
+            if i not in selected_indices
+        ]
+        remaining_indices.sort(
+            key=lambda i: (-self.order_similarity(seed, self.pending_orders[i]), i)
+        )
+
+        for i in remaining_indices:
+            if len(selected_indices) >= batch_size:
+                break
+            selected_indices.add(i)
+
+        selected_orders = [self.pending_orders[i] for i in sorted(selected_indices)]
+        remaining_orders = [
+            order for i, order in enumerate(self.pending_orders)
+            if i not in selected_indices
+        ]
+        return selected_orders, remaining_orders
+
+    # Decides batch size, then returns a batch of that size created via. select_similar_batch
     def create_batch(self, picker, final=False):
         if not final and len(self.pending_orders) < params.BATCH_SIZE_MIN:
             return None
 
         batch_size = min(len(self.pending_orders), params.BATCH_SIZE_MAX)
-        batch_orders = self.pending_orders[:batch_size]
-        self.pending_orders = self.pending_orders[batch_size:]
+        batch_orders, self.pending_orders = self.select_similar_batch(batch_size)
 
         return Batch(orders=batch_orders, picker_id=picker.id)
 
