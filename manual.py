@@ -11,6 +11,13 @@ from setup_layout import setup_medium, map_of_coords, nearest_neighbor, path_dis
 # Orders waiting longer than this are forceed into the next batch
 SIMILARITY_BATCH_MAX_WAIT = 90 * 60  # 1.5 hours
 
+# If the pending queue has been non-empty this long without reaching
+# BATCH_SIZE_MIN, dispatch it anyway rather than waiting indefinitely.
+# At the default arrival rate, filling a batch of BATCH_SIZE_MIN takes ~3 min
+# on average (std ~73s), so 5 min (~1.6 std above the mean) only fires during
+# below-average arrival stretches without preempting normal batch formation.
+BATCH_TIMEOUT = 5 * 60  # 5 minutes
+
 # A customer order with items to be picked from the store
 @dataclass
 class Order:
@@ -187,6 +194,8 @@ class Simulation:
         self.pending_orders.append(order)
         if len(self.pending_orders) >= params.BATCH_SIZE_MIN:
             self.schedule(self.time, "BATCH_DISPATCH", None)
+        elif len(self.pending_orders) == 1:
+            self.schedule(self.time + BATCH_TIMEOUT, "BATCH_DISPATCH", {"timeout": True})
 
     # At sim end, push any remaining pending orders into a final batch
     def handle_end_flush(self):
@@ -249,8 +258,10 @@ class Simulation:
         return selected_orders, remaining_orders
 
     # Decides batch size, then returns a batch of that size created via. select_similar_batch
-    def create_batch(self, picker, final=False):
-        if not final and len(self.pending_orders) < params.BATCH_SIZE_MIN:
+    def create_batch(self, picker, force=False):
+        if not self.pending_orders:
+            return None
+        if not force and len(self.pending_orders) < params.BATCH_SIZE_MIN:
             return None
 
         batch_size = min(len(self.pending_orders), params.BATCH_SIZE_MAX)
@@ -303,9 +314,16 @@ class Simulation:
     # Main order handling function which routes a batch, computes pick times, and schedules its completion
     def handle_batch(self, payload):
         final = isinstance(payload, dict) and payload.get("final", False)
+        # A timeout event forces a dispatch if the oldest pending order has waited BATCH_TIMEOUT
+        timeout = (
+            isinstance(payload, dict) and payload.get("timeout", False)
+            and self.pending_orders
+            and self.time - self.pending_orders[0].arrival_time >= BATCH_TIMEOUT
+        )
+        force = final or timeout
 
         # Abort if batch is not valid
-        if not final and len(self.pending_orders) < params.BATCH_SIZE_MIN:
+        if not force and len(self.pending_orders) < params.BATCH_SIZE_MIN:
             return
 
         # Check picker availability before pulling orders from pending_orders,
@@ -315,7 +333,7 @@ class Simulation:
             self.schedule(picker.available_time, "BATCH_DISPATCH", payload)
             return
 
-        batch = self.create_batch(picker, final=final)
+        batch = self.create_batch(picker, force=force)
         if batch is None: # Invalid batch-catching
             return
 
