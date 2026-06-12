@@ -11,11 +11,7 @@ from setup_layout import setup_medium, map_of_coords, nearest_neighbor, path_dis
 # Orders waiting longer than this are forceed into the next batch
 SIMILARITY_BATCH_MAX_WAIT = 90 * 60  # 1.5 hours
 
-# If the pending queue has been non-empty this long without reaching
-# BATCH_SIZE_MIN, dispatch it anyway rather than waiting indefinitely.
-# At the default arrival rate, filling a batch of BATCH_SIZE_MIN takes ~3 min
-# on average (std ~73s), so 5 min (~1.6 std above the mean) only fires during
-# below-average arrival stretches without preempting normal batch formation.
+# If the pending queue has been non-empty this long without reaching BATCH_SIZE_MIN, force a dispatch
 BATCH_TIMEOUT = 5 * 60  # 5 minutes
 
 # A customer order with items to be picked from the store
