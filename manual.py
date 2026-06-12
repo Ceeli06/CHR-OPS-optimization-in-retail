@@ -81,10 +81,12 @@ class Metrics:
         self.amr_idle = 0.0
 
         self.perishable_exposure = []
+        self.spoiled_perishables = 0
+        self.total_perishables = 0
 
     # Record a completed order's comp.time and check if it missed the due time
     def record_completion(self, order: Order):
-        completion_delay = order.completion_time - order.arrival_time
+        completion_delay = (order.completion_time - order.arrival_time) + params.STAGING_TIME
         self.completion_times.append(completion_delay)
 
         if completion_delay > params.ORDER_DUE_TIME:
@@ -106,14 +108,20 @@ class Metrics:
             if self.perishable_exposure else 0.0
         )
 
+        spoiled_pct = (
+            (self.spoiled_perishables / self.total_perishables) * 100
+            if self.total_perishables else 0.0
+        )
+
         print("\n===== METRICS =====")
-        print(f"Avg completion time: {avg_completion:.2f} sec")
-        print(f"Late %: {late_pct:.2f}")
-        print(f"Human distance: {self.human_distance:.2f}")
-        print(f"Human idle: {self.human_idle:.2f}")
-        print(f"AMR idle: {self.amr_idle:.2f}")
+        print(f"Avg completion time: {avg_completion/60:.2f} min")
+        print(f"Late orders: {late_pct:.2f}%")
+        print(f"Total picker travel distance: {self.human_distance:.2f} meters")
+        print(f"Total picker idle time: {self.human_idle/60:.2f} min")
+        print(f"Total AMR idle time: {self.amr_idle/60:.2f} min")
         print(f"AMR utilization: {amr_util:.2f}%")
-        print(f"Avg perishable exposure: {avg_exposure:.2f} sec")
+        print(f"Avg perishable exposure time: {avg_exposure/60:.2f} min")
+        print(f"Spoiled perishables: {spoiled_pct:.2f}%")
         print(f"Throughput: {throughput:.2f} orders/hour")
 
 
@@ -197,6 +205,14 @@ class Simulation:
     # Greedy orrder assignment, picking whichever picker becomes available earliest
     def select_picker(self):
         return min(self.pickers, key=lambda p: p.available_time)
+
+    # Count the total quantity of perishable item units in an order
+    def perishable_item_count(self, order):
+        return sum(
+            item.get("quantity", 1)
+            for item in order.items
+            if str(item.get("department", "")).lower().find("perishable") >= 0
+        )
 
     # Determine which of an order's coords belong to its perishable items
     # (mirrors orderGen.generate_order_coords' per-item quantity expansion)
@@ -322,7 +338,12 @@ class Simulation:
                     start_time = order.pick_start_time
                 else:
                     start_time = order.arrival_time
-                self.metrics.perishable_exposure.append(order.completion_time - start_time)
+                exposure = order.completion_time - start_time
+                item_count = self.perishable_item_count(order)
+                self.metrics.perishable_exposure.extend([exposure] * item_count)
+                self.metrics.total_perishables += item_count
+                if exposure > params.FREEZER_PERISHABLE_TIME:
+                    self.metrics.spoiled_perishables += item_count
 
         # Schedule next batch if enough orders
         if len(self.pending_orders) >= params.BATCH_SIZE_MIN:
