@@ -5,7 +5,6 @@
 import params
 from dataclasses import dataclass
 
-
 # A customer order with items to be picked from the store
 @dataclass
 class Order:

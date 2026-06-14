@@ -9,6 +9,12 @@ from orderGen import generate_orders
 from setup_layout import setup_medium, map_of_coords, nearest_neighbor, path_distance, all_distance_maps
 from models import Order, Picker, AMR, Batch, Metrics
 
+# Orders waiting longer than this are forceed into the next batch
+SIMILARITY_BATCH_MAX_WAIT = 90 * 60  # 1.5 hours
+
+# If the pending queue has been non-empty this long without reaching BATCH_SIZE_MIN, force a dispatch
+BATCH_TIMEOUT = 5 * 60  # 5 minutes
+
 # Main DES simulation, where time advances only when events occur (arrivals, dispatches, completions)
 class Simulation:
 
@@ -297,7 +303,6 @@ class Simulation:
         # Schedule next batch if enough orders
         if len(self.pending_orders) >= params.BATCH_SIZE_MIN:
             self.schedule(self.time, "BATCH_DISPATCH", None)
-
 
 
 # Main experimentation space where testing occurs
