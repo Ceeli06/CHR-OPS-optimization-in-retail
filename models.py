@@ -79,6 +79,7 @@ class AMR:
 class Batch:
     orders: list
     picker_id: int
+    amr_id: int
 
 
 # Utilities to collect and print key performance metrics at end of simulation
