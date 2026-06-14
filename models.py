@@ -117,6 +117,8 @@ class Metrics:
 
         # AMR utilization (ignored for manual policy since AMR not used)
         amr_util = ((sim_time - self.amr_idle) / sim_time) * 100 if sim_time > 0 else 0.0
+        # NOTE: above breaks down when there are just amrs idle (never utilized), will be negative..is this okay?
+        
 
         avg_exposure = (
             sum(self.perishable_exposure) / len(self.perishable_exposure)

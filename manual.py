@@ -142,7 +142,7 @@ class Simulation:
         batch_size = min(len(self.pending_orders), params.BATCH_SIZE_MAX)
         batch_orders, self.pending_orders = self.select_similar_batch(batch_size)
 
-        return Batch(orders=batch_orders, picker_id=picker.id)
+        return Batch(orders=batch_orders, picker_id=picker.id, amr_id = None)
 
     # Greedy orrder assignment, picking whichever picker becomes available earliest
     def select_picker(self):
@@ -216,7 +216,8 @@ class Simulation:
 
         route = self.build_route(batch.orders)
         travel_distance = path_distance(route, self.dist_map)
-        travel_time = travel_distance / params.WALKING_SPEED
+        travel_time = travel_distance / params.WALKING_SPEED 
+        
 
         time_cursor = self.time + travel_time # Holds time from batch start to end
 

@@ -221,9 +221,10 @@ class Simulation:
 
         route = self.build_route(batch.orders)
         travel_distance = path_distance(route, self.dist_map)
-        travel_time = travel_distance / params.WALKING_SPEED
+        human_travel_time = travel_distance / params.WALKING_SPEED
+        amr_travel_time = travel_distance / params.AMR_SPEED
 
-        time_cursor = self.time + travel_time # Holds time from batch start to end
+        time_cursor = self.time + max(human_travel_time, amr_travel_time) # Holds time from batch start to end
 
         # Map each location to the orders that have items there
         coord_orders = {}
