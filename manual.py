@@ -8,6 +8,11 @@ from dataclasses import dataclass
 from orderGen import generate_orders
 from setup_layout import setup_medium, map_of_coords, nearest_neighbor, path_distance, all_distance_maps
 
+# Orders waiting longer than this are forceed into the next batch
+SIMILARITY_BATCH_MAX_WAIT = 90 * 60  # 1.5 hours
+
+# If the pending queue has been non-empty this long without reaching BATCH_SIZE_MIN, force a dispatch
+BATCH_TIMEOUT = 5 * 60  # 5 minutes
 
 # A customer order with items to be picked from the store
 @dataclass
@@ -20,6 +25,9 @@ class Order:
 
     pick_start_time: float = None  # When picker first touches this order's items
     completion_time: float = None  # When all items are picked
+
+    perishable_coords: set = None  # Coords belonging to this order's perishable items
+    perishable_picked_at: float = None  # When a perishable item was picked
 
 
 # A human store associate who picks orders
@@ -78,13 +86,15 @@ class Metrics:
         self.amr_idle = 0.0
 
         self.perishable_exposure = []
+        self.spoiled_perishables = 0
+        self.total_perishables = 0
 
     # Record a completed order's comp.time and check if it missed the due time
     def record_completion(self, order: Order):
-        completion_delay = order.completion_time - order.arrival_time
-        self.completion_times.append(completion_delay)
+        final_completion_time = (order.completion_time - order.arrival_time) + params.STAGING_TIME
+        self.completion_times.append(final_completion_time)
 
-        if completion_delay > params.ORDER_DUE_TIME:
+        if final_completion_time > params.ORDER_DUE_TIME:
             self.late_orders += 1
 
         self.total_orders += 1
@@ -103,14 +113,20 @@ class Metrics:
             if self.perishable_exposure else 0.0
         )
 
+        spoiled_pct = (
+            (self.spoiled_perishables / self.total_perishables) * 100
+            if self.total_perishables else 0.0
+        )
+
         print("\n===== METRICS =====")
-        print(f"Avg completion time: {avg_completion:.2f} sec")
-        print(f"Late %: {late_pct:.2f}")
-        print(f"Human distance: {self.human_distance:.2f}")
-        print(f"Human idle: {self.human_idle:.2f}")
-        print(f"AMR idle: {self.amr_idle:.2f}")
+        print(f"Avg completion time: {avg_completion/60:.2f} min")
+        print(f"Late orders: {late_pct:.2f}%")
+        print(f"Total picker travel distance: {self.human_distance:.2f} meters")
+        print(f"Total picker idle time: {self.human_idle/60:.2f} min")
+        print(f"Total AMR idle time: {self.amr_idle/60:.2f} min")
         print(f"AMR utilization: {amr_util:.2f}%")
-        print(f"Avg perishable exposure: {avg_exposure:.2f} sec")
+        print(f"Avg perishable exposure time: {avg_exposure/60:.2f} min")
+        print(f"Spoiled perishables: {spoiled_pct:.2f}%")
         print(f"Throughput: {throughput:.2f} orders/hour")
 
 
@@ -174,26 +190,106 @@ class Simulation:
         self.pending_orders.append(order)
         if len(self.pending_orders) >= params.BATCH_SIZE_MIN:
             self.schedule(self.time, "BATCH_DISPATCH", None)
+        elif len(self.pending_orders) == 1:
+            self.schedule(self.time + BATCH_TIMEOUT, "BATCH_DISPATCH", {"timeout": True})
 
     # At sim end, push any remaining pending orders into a final batch
     def handle_end_flush(self):
         if self.pending_orders:
             self.schedule(self.time, "BATCH_DISPATCH", {"final": True})
 
-    # Pull orders off the pending queue up to BATCH_SIZE_MAX for the given, free picker
-    def create_batch(self, picker, final=False):
-        if not final and len(self.pending_orders) < params.BATCH_SIZE_MIN:
+    # Helper that returns a set of all department names in an order
+    def department_set(self, order):
+        return {
+            str(item.get("department", "")).lower()
+            for item in order.items
+        }
+
+    # Gets Jaccard similarity of two order's department sets (0 = completely different, 1 = identical)
+    def order_similarity(self, a, b):
+        depts_a = self.department_set(a)
+        depts_b = self.department_set(b)
+        union = depts_a | depts_b
+        if not union:
+            return 0.0
+        return len(depts_a & depts_b) / len(union)
+
+    # Adds orders to batch starting with oldest order in queue, then any orders waiting over
+    # SIMILARITY_BATCH_MAX_WAIT, then uses Jaccard helper to greedily select remaining orders
+    # Returning slected and the remaining orders (in the same sequence as before)
+    def select_similar_batch(self, batch_size):
+        if batch_size >= len(self.pending_orders):
+            return list(self.pending_orders), []
+
+        selected_indices = {0}  # Seed = oldest order (index 0), always included
+        seed = self.pending_orders[0]
+
+        # Force-include any order that has waited too long starting with oldest
+        for i in range(1, len(self.pending_orders)):
+            if len(selected_indices) >= batch_size:
+                break
+            order = self.pending_orders[i]
+            if self.time - order.arrival_time >= SIMILARITY_BATCH_MAX_WAIT:
+                selected_indices.add(i)
+
+        # Greedily fill remaining slots via. Jaccard with orders most similar to the first order (seed)
+        remaining_indices = [
+            i for i in range(1, len(self.pending_orders))
+            if i not in selected_indices
+        ]
+        remaining_indices.sort(
+            key=lambda i: (-self.order_similarity(seed, self.pending_orders[i]), i)
+        )
+
+        for i in remaining_indices:
+            if len(selected_indices) >= batch_size:
+                break
+            selected_indices.add(i)
+
+        selected_orders = [self.pending_orders[i] for i in sorted(selected_indices)]
+        remaining_orders = [
+            order for i, order in enumerate(self.pending_orders)
+            if i not in selected_indices
+        ]
+        return selected_orders, remaining_orders
+
+    # Decides batch size, then returns a batch of that size created via. select_similar_batch
+    def create_batch(self, picker, force=False):
+        if not self.pending_orders:
+            return None
+        if not force and len(self.pending_orders) < params.BATCH_SIZE_MIN:
             return None
 
         batch_size = min(len(self.pending_orders), params.BATCH_SIZE_MAX)
-        batch_orders = self.pending_orders[:batch_size]
-        self.pending_orders = self.pending_orders[batch_size:]
+        batch_orders, self.pending_orders = self.select_similar_batch(batch_size)
 
         return Batch(orders=batch_orders, picker_id=picker.id)
 
     # Greedy orrder assignment, picking whichever picker becomes available earliest
     def select_picker(self):
         return min(self.pickers, key=lambda p: p.available_time)
+
+    # Count the total quantity of perishable item units in an order
+    def perishable_item_count(self, order):
+        return sum(
+            item.get("quantity", 1)
+            for item in order.items
+            if str(item.get("department", "")).lower().find("perishable") >= 0
+        )
+
+    # Determine which of an order's coords belong to its perishable items
+    # (mirrors orderGen.generate_order_coords' per-item quantity expansion)
+    def perishable_coords_for_order(self, order):
+        coords_iter = iter(order.coords)
+        perishable_coords = set()
+        for item in order.items:
+            quantity = item.get("quantity", 1)
+            is_perishable_item = str(item.get("department", "")).lower().find("perishable") >= 0
+            for _ in range(quantity):
+                coord = next(coords_iter)
+                if is_perishable_item:
+                    perishable_coords.add(coord)
+        return perishable_coords
 
     # Build a nearest-neighbor route for the batch from staging through all item locations and back
     def build_route(self, orders):
@@ -214,9 +310,16 @@ class Simulation:
     # Main order handling function which routes a batch, computes pick times, and schedules its completion
     def handle_batch(self, payload):
         final = isinstance(payload, dict) and payload.get("final", False)
+        # A timeout event forces a dispatch if the oldest pending order has waited BATCH_TIMEOUT
+        timeout = (
+            isinstance(payload, dict) and payload.get("timeout", False)
+            and self.pending_orders
+            and self.time - self.pending_orders[0].arrival_time >= BATCH_TIMEOUT
+        )
+        force = final or timeout
 
         # Abort if batch is not valid
-        if not final and len(self.pending_orders) < params.BATCH_SIZE_MIN:
+        if not force and len(self.pending_orders) < params.BATCH_SIZE_MIN:
             return
 
         # Check picker availability before pulling orders from pending_orders,
@@ -226,7 +329,7 @@ class Simulation:
             self.schedule(picker.available_time, "BATCH_DISPATCH", payload)
             return
 
-        batch = self.create_batch(picker, final=final)
+        batch = self.create_batch(picker, force=force)
         if batch is None: # Invalid batch-catching
             return
 
@@ -247,6 +350,8 @@ class Simulation:
                 str(item.get("department", "")).lower().find("perishable") >= 0
                 for item in order.items
             )
+            order.perishable_coords = self.perishable_coords_for_order(order)
+            order.perishable_picked_at = None
             for coord in order.coords:
                 coord_orders.setdefault(coord, []).append(order)
 
@@ -268,6 +373,9 @@ class Simulation:
             for order in seen_orders.values(): # For each item in "seen orders"
                 if order.pick_start_time is None:
                     order.pick_start_time = time_cursor - pick_duration
+                if (order.is_perishable and order.perishable_picked_at is None
+                        and node in order.perishable_coords):
+                    order.perishable_picked_at = time_cursor - pick_duration
                 decrement = sum(1 for coord in order.coords if coord == node)
                 order.items_remaining -= decrement # Decrement items remaining in batch
                 if order.items_remaining <= 0 and order.completion_time is None:
@@ -294,8 +402,18 @@ class Simulation:
                 order.completion_time = self.time
             self.metrics.record_completion(order)
             if order.is_perishable:
-                start_time = order.pick_start_time if order.pick_start_time is not None else order.arrival_time
-                self.metrics.perishable_exposure.append(order.completion_time - start_time)
+                if order.perishable_picked_at is not None:
+                    start_time = order.perishable_picked_at
+                elif order.pick_start_time is not None:
+                    start_time = order.pick_start_time
+                else:
+                    start_time = order.arrival_time
+                exposure = order.completion_time - start_time
+                item_count = self.perishable_item_count(order)
+                self.metrics.perishable_exposure.extend([exposure] * item_count)
+                self.metrics.total_perishables += item_count
+                if exposure > params.FREEZER_PERISHABLE_TIME:
+                    self.metrics.spoiled_perishables += item_count
 
         # Schedule next batch if enough orders
         if len(self.pending_orders) >= params.BATCH_SIZE_MIN:
