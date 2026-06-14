@@ -5,6 +5,13 @@
 import params
 from dataclasses import dataclass
 
+
+# Orders waiting longer than this are forceed into the next batch
+SIMILARITY_BATCH_MAX_WAIT = 90 * 60  # 1.5 hours
+
+# If the pending queue has been non-empty this long without reaching BATCH_SIZE_MIN, force a dispatch
+BATCH_TIMEOUT = 5 * 60  # 5 minutes
+
 # A customer order with items to be picked from the store
 @dataclass
 class Order:
@@ -54,6 +61,17 @@ class AMR:
     is_idle: bool = True
     idle_start: float = 0.0
     total_idle: float = 0.0
+
+    def mark_busy(self, current_time: float):
+        if self.is_idle:
+            self.total_idle += current_time - self.idle_start
+            self.is_idle = False
+
+    # Mark AMR as idle and record when it became idle
+    def mark_idle(self, current_time: float):
+        if not self.is_idle:
+            self.is_idle = True
+            self.idle_start = current_time
 
 
 # A set of orders grouped together for one picker to handle (6-8 per cart for manual)
