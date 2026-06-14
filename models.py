@@ -17,6 +17,9 @@ class Order:
     pick_start_time: float = None  # When picker first touches this order's items
     completion_time: float = None  # When all items are picked
 
+    perishable_coords: set = None  # Coords belonging to this order's perishable items
+    perishable_picked_at: float = None  # When a perishable item was picked
+
 
 # A human store associate who picks orders
 @dataclass
@@ -42,7 +45,7 @@ class Picker:
             self.idle_start = current_time
 
 
-# An Autonomous Mobile Robot 
+# An Autonomous Mobile Robot (currently unused in the manual policy, just here for use later)
 @dataclass
 class AMR:
     id: int
@@ -74,13 +77,15 @@ class Metrics:
         self.amr_idle = 0.0
 
         self.perishable_exposure = []
+        self.spoiled_perishables = 0
+        self.total_perishables = 0
 
     # Record a completed order's comp.time and check if it missed the due time
     def record_completion(self, order: Order):
-        completion_delay = order.completion_time - order.arrival_time
-        self.completion_times.append(completion_delay)
+        final_completion_time = (order.completion_time - order.arrival_time) + params.STAGING_TIME
+        self.completion_times.append(final_completion_time)
 
-        if completion_delay > params.ORDER_DUE_TIME:
+        if final_completion_time > params.ORDER_DUE_TIME:
             self.late_orders += 1
 
         self.total_orders += 1
@@ -99,12 +104,19 @@ class Metrics:
             if self.perishable_exposure else 0.0
         )
 
+        spoiled_pct = (
+            (self.spoiled_perishables / self.total_perishables) * 100
+            if self.total_perishables else 0.0
+        )
+
         print("\n===== METRICS =====")
-        print(f"Avg completion time: {avg_completion:.2f} sec")
-        print(f"Late %: {late_pct:.2f}")
-        print(f"Human distance: {self.human_distance:.2f}")
-        print(f"Human idle: {self.human_idle:.2f}")
-        print(f"AMR idle: {self.amr_idle:.2f}")
+        print(f"Avg completion time: {avg_completion/60:.2f} min")
+        print(f"Late orders: {late_pct:.2f}%")
+        print(f"Total picker travel distance: {self.human_distance:.2f} meters")
+        print(f"Total picker idle time: {self.human_idle/60:.2f} min")
+        print(f"Total AMR idle time: {self.amr_idle/60:.2f} min")
         print(f"AMR utilization: {amr_util:.2f}%")
-        print(f"Avg perishable exposure: {avg_exposure:.2f} sec")
+        print(f"Avg perishable exposure time: {avg_exposure/60:.2f} min")
+        print(f"Spoiled perishables: {spoiled_pct:.2f}%")
         print(f"Throughput: {throughput:.2f} orders/hour")
+
