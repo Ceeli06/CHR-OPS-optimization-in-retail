@@ -257,8 +257,10 @@ class Simulation:
             orders_at_node = coord_orders.get(node, [])
             if not orders_at_node:
                 continue
-
-            pick_duration = len(orders_at_node) * params.HUMAN_PICK_TIME
+            if (amr):
+                pick_duration = len(orders_at_node) * params.AMR_LOAD_TIME
+            else:
+                pick_duration = len(orders_at_node) * params.HUMAN_PICK_TIME
             if pick_duration > 0:
                 time_cursor += pick_duration # Update batch time every pick
 

@@ -1,6 +1,6 @@
 '''Parameters'''
 num_pickers = 1
-num_robots = 0
+num_robots = 10
 num_customers = 1  # Representative of store congestion
 pLambda = 30.0 # Lambda for arrivalTimeGen's Poisson process (pLambda DOWN == orderChance UP)
 
