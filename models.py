@@ -92,6 +92,7 @@ class Metrics:
         self.perishable_exposure = []
         self.spoiled_perishables = 0
         self.total_perishables = 0
+        self.human_wait_for_amr = 0.0
 
     # Record a completed order's comp.time and check if it missed the due time
     def record_completion(self, order: Order):
@@ -129,11 +130,13 @@ class Metrics:
         print(f"Late orders: {late_pct:.2f}%")
         print(f"Total picker travel distance: {self.human_distance:.2f} meters")
         print(f"Total picker idle time: {self.human_idle/60:.2f} min")
+        print(f"Human wait time for AMR: {self.human_wait_for_amr/60:.2f} min")
         print(f"Total AMR idle time: {self.amr_idle/60:.2f} min")
         print(f"AMR utilization: {amr_util:.2f}%")
         print(f"Avg perishable exposure time: {avg_exposure/60:.2f} min")
         print(f"Spoiled perishables: {spoiled_pct:.2f}%")
         print(f"Throughput: {throughput:.2f} orders/hour")
+
 
 # Parent simulation class that policy-specific simulations inherit from
 @dataclass
