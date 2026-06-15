@@ -1,16 +1,13 @@
-﻿# Discrete-event simulation for a manual (human-only) retail order picking policy.
-# Orders arrive via Poisson process, are batched (6-8 per cart), 
-# assigned to a picker, and routed using a greedy nearest-neighbor heuristic algorithm
-
 import heapq
 import params
 from dataclasses import dataclass
 from orderGen import generate_orders
-from setup_layout import setup_medium, map_of_coords, path_distance, all_distance_maps, build_route
+from setup_layout import setup_medium, map_of_coords, build_route, path_distance, all_distance_maps
 from models import Order, Picker, AMR, Batch, Metrics, SIMILARITY_BATCH_MAX_WAIT, BATCH_TIMEOUT
 
 # Main DES simulation, where time advances only when events occur (arrivals, dispatches, completions)
 class Simulation:
+
     def __init__(self, orders, pickers, amrs, coord_map, staging=(0, 0), dist_map=None):
         self.time = 0.0
         self.event_queue = []  # Event queue containing: (time, counter, event_type, payload)
@@ -27,6 +24,12 @@ class Simulation:
         self.metrics = Metrics()
         self.map = coord_map
 
+        #Sets up event queue for scheduling order events
+        for order in self.orders:
+            self.schedule(order.arrival_time, "ORDER_ARRIVAL", order)
+
+        self.schedule(params.SIM_TIME, "SIM_END_FLUSH", None)
+
     # Push an event onto the priority queue using heapq
     def schedule(self, time: float, event_type: str, payload):
         heapq.heappush(self.event_queue, (time, self.event_counter, event_type, payload))
@@ -34,11 +37,6 @@ class Simulation:
 
     # Main simulation loop which processes events in chronological order until time exceeds SIM_TIME
     def run(self):
-        for order in self.orders:
-            self.schedule(order.arrival_time, "ORDER_ARRIVAL", order)
-
-        self.schedule(params.SIM_TIME, "SIM_END_FLUSH", None)
-
         while self.event_queue:
             self.time, _, event_type, payload = heapq.heappop(self.event_queue)
             # Once SIM_TIME is exceeded, stop starting new work, but still flush
@@ -65,6 +63,7 @@ class Simulation:
         self.metrics.finalize(params.SIM_TIME)
 
     # Add an arriving order to the queue of pending orders, dispatching a batch once enough have piled up
+    # Sends order to be batched
     def handle_order_arrival(self, order: Order):
         self.pending_orders.append(order)
         if len(self.pending_orders) >= params.BATCH_SIZE_MIN:
@@ -133,7 +132,7 @@ class Simulation:
         return selected_orders, remaining_orders
 
     # Decides batch size, then returns a batch of that size created via. select_similar_batch
-    def create_batch(self, picker, force=False):
+    def create_batch(self, picker, amr, force=False):
         if not self.pending_orders:
             return None
         if not force and len(self.pending_orders) < params.BATCH_SIZE_MIN:
@@ -141,12 +140,20 @@ class Simulation:
 
         batch_size = min(len(self.pending_orders), params.BATCH_SIZE_MAX)
         batch_orders, self.pending_orders = self.select_similar_batch(batch_size)
+        amrId = None
+        if (amr):
+            amrId = amr.id
 
-        return Batch(orders=batch_orders, picker_id=picker.id, amr_id = None)
+        return Batch(orders=batch_orders, picker_id=picker.id, amr_id = amrId)
 
-    # Greedy orrder assignment, picking whichever picker becomes available earliest
+    # Greedy order assignment, picking whichever picker becomes available earliest
     def select_picker(self):
         return min(self.pickers, key=lambda p: p.available_time)
+    
+    def select_amr(self):
+        if len(self.amrs) == 0:
+            return
+        return min(self.amrs, key=lambda p: p.available_time) 
 
     # Count the total quantity of perishable item units in an order
     def perishable_item_count(self, order):
@@ -204,22 +211,30 @@ class Simulation:
         # Check picker availability before pulling orders from pending_orders,
         # so a busy picker doesn't cause orders to be lost on reschedule
         picker = self.select_picker()
-        if picker.available_time > self.time:
-            self.schedule(picker.available_time, "BATCH_DISPATCH", payload)
+        amr = self.select_amr()
+
+        # Schedules batch dispatch in the future if picker and/or AMR not available and returns 
+        if picker.available_time > self.time or (amr != None and amr.available_time > self.time):
+            time = 0
+            if (amr):
+                time = amr.available_time
+            self.schedule(max(picker.available_time, time), "BATCH_DISPATCH", payload)
             return
 
-        batch = self.create_batch(picker, force=force)
+        batch = self.create_batch(picker, amr, force=force)
         if batch is None: # Invalid batch-catching
             return
 
         picker.mark_busy(self.time)
+        if (amr):
+            amr.mark_busy(self.time)
 
         route = self.build_route(batch.orders)
         travel_distance = path_distance(route, self.dist_map)
-        travel_time = travel_distance / params.WALKING_SPEED 
-        
+        human_travel_time = travel_distance / params.WALKING_SPEED
+        amr_travel_time = travel_distance / params.AMR_SPEED
 
-        time_cursor = self.time + travel_time # Holds time from batch start to end
+        time_cursor = self.time + max(human_travel_time, amr_travel_time) # Holds time from batch start to end
 
         # Map each location to the orders that have items there
         coord_orders = {}
@@ -242,8 +257,10 @@ class Simulation:
             orders_at_node = coord_orders.get(node, [])
             if not orders_at_node:
                 continue
-
-            pick_duration = len(orders_at_node) * params.HUMAN_PICK_TIME
+            if (amr):
+                pick_duration = len(orders_at_node) * params.AMR_LOAD_TIME
+            else: 
+                pick_duration = len(orders_at_node) * params.HUMAN_PICK_TIME
             if pick_duration > 0:
                 time_cursor += pick_duration # Update batch time every pick
 
@@ -268,6 +285,8 @@ class Simulation:
         # Update picker avalible time and schedule a pick complete event
         finish_time = time_cursor
         picker.available_time = finish_time
+        if (amr):
+            amr.available_time = finish_time
         self.schedule(finish_time, "PICK_COMPLETE", batch)
 
     # Mark picker idle, record metrics for the completed batch, and schedule the next one if ready
@@ -275,6 +294,9 @@ class Simulation:
         # Update picker
         picker = self.pickers[batch.picker_id]
         picker.mark_idle(self.time)
+        if (batch.amr_id):
+            amr = self.amrs[batch.amr_id]
+            amr.mark_idle(self.time)
 
         # Record order completion times and perishible exposure times
         for order in batch.orders:
