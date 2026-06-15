@@ -87,8 +87,6 @@ class FollowSim(models.Simulation):
         amr_travel_time = travel_distance / params.AMR_SPEED
 
         time_cursor = self.time + max(human_travel_time, amr_travel_time) # Holds time from batch start to end
-        human_time_cursor = self.time + human_travel_time
-        amr_time_cursor = self.time + amr_travel_time if amr else human_time_cursor
 
         # Map each location to the orders that have items there
         coord_orders = {}
@@ -113,12 +111,10 @@ class FollowSim(models.Simulation):
                 continue
             if (amr):
                 pick_duration = len(orders_at_node) * params.AMR_LOAD_TIME
-                amr_time_cursor+=pick_duration
             else: 
                 pick_duration = len(orders_at_node) * params.HUMAN_PICK_TIME
-                human_time_cursor+=pick_duration
             if pick_duration > 0:
-                time_cursor = max(human_time_cursor, amr_time_cursor)  # Update batch time every pick
+                time_cursor += pick_duration # Update batch time every pick
 
             seen_orders = {}
             for order in orders_at_node: # Add all items at node to "seen orders"
@@ -137,16 +133,14 @@ class FollowSim(models.Simulation):
         # Update walking distance of picker and global total
         picker.distance_walked += travel_distance
         self.metrics.human_distance += travel_distance
+        self.metrics.human_wait_for_amr = max(0, amr_travel_time - human_travel_time)
+        self.metrics.human_idle += max(0, amr_travel_time - human_travel_time)
 
         # Update picker avalible time and schedule a pick complete event
         finish_time = time_cursor
         picker.available_time = finish_time
         if (amr):
-            human_wait = max(0, amr_time_cursor - human_time_cursor)
-            self.metrics.human_wait_for_amr += human_wait
-            picker.total_idle += human_wait  
             amr.available_time = finish_time
-        
         self.schedule(finish_time, "PICK_COMPLETE", batch)
 
 # Main experimentation space where testing occurs
