@@ -141,7 +141,7 @@ def path_distance(path, dist_map):
 
     return total
 
-def build_route(orders, dist_map, staging, map):
+def get_path(orders, dist_map, staging, map):
     perishables = []
     non_perishables = []
 
@@ -156,4 +156,3 @@ def build_route(orders, dist_map, staging, map):
     totalRoute = front + end[1:]
     totalRoute.append(staging)
     return totalRoute
-
