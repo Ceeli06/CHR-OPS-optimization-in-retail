@@ -2,13 +2,13 @@ import heapq
 import params
 from dataclasses import dataclass
 from orderGen import generate_orders
-from setup_layout import setup_medium, map_of_coords, nearest_neighbor, path_distance, all_distance_maps
+from setup_layout import setup_medium, map_of_coords, build_route, path_distance, all_distance_maps
 from models import Order, Picker, AMR, Batch, Metrics, SIMILARITY_BATCH_MAX_WAIT, BATCH_TIMEOUT
 
 # Main DES simulation, where time advances only when events occur (arrivals, dispatches, completions)
 class Simulation:
 
-    def __init__(self, orders, pickers, amrs, staging=(0, 0), dist_map=None):
+    def __init__(self, orders, pickers, amrs, coord_map, staging=(0, 0), dist_map=None):
         self.time = 0.0
         self.event_queue = []  # Event queue containing: (time, counter, event_type, payload)
         self.event_counter = 0  # Used so events with same arrival_time process FIFO
@@ -22,6 +22,7 @@ class Simulation:
         self.staging = staging
         self.dist_map = dist_map
         self.metrics = Metrics()
+        self.map = coord_map
 
         #Sets up event queue for scheduling order events
         for order in self.orders:
@@ -186,7 +187,7 @@ class Simulation:
         if not unique_coords:
             return [self.staging]
 
-        route = nearest_neighbor(unique_coords, self.dist_map, self.staging)
+        route = build_route(unique_coords, self.dist_map, self.staging, self.map)
         if not route or route[-1] != self.staging:
             route.append(self.staging)
 
@@ -345,5 +346,5 @@ if __name__ == "__main__":
     pickers = [Picker(i, staging) for i in range(params.num_pickers)]
     amrs = [AMR(i, staging) for i in range(params.num_robots)]
 
-    sim = Simulation(orders, pickers, amrs, staging=staging, dist_map=dist_map)
+    sim = Simulation(orders, pickers, amrs, coord_map, staging=staging, dist_map=dist_map)
     sim.run()

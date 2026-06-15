@@ -146,7 +146,7 @@ def build_route(orders, dist_map, staging, map):
     non_perishables = []
 
     for order in orders:
-        if order in map[2]:
+        if order in map['2']:
             perishables.append(order)
         else:
             non_perishables.append(order)
