@@ -139,15 +139,20 @@ class Simulation:
 
         batch_size = min(len(self.pending_orders), params.BATCH_SIZE_MAX)
         batch_orders, self.pending_orders = self.select_similar_batch(batch_size)
+        amrId = None
+        if (amr):
+            amrId = amr.id
 
-        return Batch(orders=batch_orders, picker_id=picker.id, amr_id = amr.id)
+        return Batch(orders=batch_orders, picker_id=picker.id, amr_id = amrId)
 
     # Greedy order assignment, picking whichever picker becomes available earliest
     def select_picker(self):
         return min(self.pickers, key=lambda p: p.available_time)
     
     def select_amr(self):
-        return min(self.amrs, key=lambda p: p.available_time)
+        if len(self.amrs) == 0:
+            return
+        return min(self.amrs, key=lambda p: p.available_time) 
 
     # Count the total quantity of perishable item units in an order
     def perishable_item_count(self, order):
@@ -208,8 +213,11 @@ class Simulation:
         amr = self.select_amr()
 
         # Schedules batch dispatch in the future if picker and/or AMR not available and returns 
-        if picker.available_time > self.time or amr.available_time > self.time:
-            self.schedule(max(picker.available_time, amr.available_time), "BATCH_DISPATCH", payload)
+        if picker.available_time > self.time or (amr != None and amr.available_time > self.time):
+            time = 0
+            if (amr):
+                time = amr.available_time
+            self.schedule(max(picker.available_time, time), "BATCH_DISPATCH", payload)
             return
 
         batch = self.create_batch(picker, amr, force=force)
@@ -217,7 +225,8 @@ class Simulation:
             return
 
         picker.mark_busy(self.time)
-        amr.mark_busy(self.time)
+        if (amr):
+            amr.mark_busy(self.time)
 
         route = self.build_route(batch.orders)
         travel_distance = path_distance(route, self.dist_map)
@@ -273,7 +282,8 @@ class Simulation:
         # Update picker avalible time and schedule a pick complete event
         finish_time = time_cursor
         picker.available_time = finish_time
-        amr.available_time = finish_time
+        if (amr):
+            amr.available_time = finish_time
         self.schedule(finish_time, "PICK_COMPLETE", batch)
 
     # Mark picker idle, record metrics for the completed batch, and schedule the next one if ready
@@ -281,8 +291,9 @@ class Simulation:
         # Update picker
         picker = self.pickers[batch.picker_id]
         picker.mark_idle(self.time)
-        amr = self.amrs[batch.amr_id]
-        amr.mark_idle(self.time)
+        if (batch.amr_id):
+            amr = self.amrs[batch.amr_id]
+            amr.mark_idle(self.time)
 
         # Record order completion times and perishible exposure times
         for order in batch.orders:

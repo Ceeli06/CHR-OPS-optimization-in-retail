@@ -11,7 +11,6 @@ from models import Order, Picker, AMR, Batch, Metrics, SIMILARITY_BATCH_MAX_WAIT
 
 # Main DES simulation, where time advances only when events occur (arrivals, dispatches, completions)
 class Simulation:
-
     def __init__(self, orders, pickers, amrs, staging=(0, 0), dist_map=None):
         self.time = 0.0
         self.event_queue = []  # Event queue containing: (time, counter, event_type, payload)
