@@ -259,7 +259,7 @@ class Simulation:
                 continue
             if (amr):
                 pick_duration = len(orders_at_node) * params.AMR_LOAD_TIME
-            else:
+            else: 
                 pick_duration = len(orders_at_node) * params.HUMAN_PICK_TIME
             if pick_duration > 0:
                 time_cursor += pick_duration # Update batch time every pick
