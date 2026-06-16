@@ -19,7 +19,6 @@ class FollowSim(models.Simulation):
             amrId = amr.id
 
         batch = models.Batch(orders=batch_orders, picker_id = picker.id, amr_id = amrId)
-        #print(batch)
         return batch
 
     # Greedy order assignment, picking whichever picker becomes available earliest
@@ -37,13 +36,11 @@ class FollowSim(models.Simulation):
         for order in orders:
             coords.extend(order.coords)
 
-        coords = [(0,10)]
         unique_coords = list(dict.fromkeys(coords))
         if not unique_coords:
             return [self.staging]
 
         route = get_path(unique_coords, self.dist_map, self.staging, self.map)
-        print(route)
         if not route or route[-1] != self.staging:
             route.append(self.staging)
 
@@ -87,6 +84,7 @@ class FollowSim(models.Simulation):
 
         route = self.build_route(batch.orders)
         travel_distance = path_distance(route, self.dist_map)
+        print("dist", travel_distance)
         human_travel_time = travel_distance / params.WALKING_SPEED
         amr_travel_time = travel_distance / params.AMR_SPEED
 
@@ -155,7 +153,7 @@ if __name__ == "__main__":
     staging = coord_map["S"][0]
 
     # Precompute list of orders
-    raw_orders = generate_orders(coord_map, params.SIM_TIME, params.ORDER_ARRIVAL_RATE)
+    raw_orders = generate_orders(coord_map, params.SIM_TIME, layout, params.ORDER_ARRIVAL_RATE)
     orders = [
        models.Order(
             id=raw_order["order_id"],

@@ -111,7 +111,7 @@ class Metrics:
         throughput = self.total_orders / (sim_time / 3600) if sim_time > 0 else 0.0
 
         # AMR utilization (ignored for manual policy since AMR not used)
-        amr_util = ((sim_time - self.amr_idle) / sim_time) * 100 if sim_time > 0 else 0.0
+        amr_util = ((sim_time - ((self.amr_idle)/params.num_robots)) / sim_time) * 100 if sim_time > 0 else 0.0
         # NOTE: above breaks down when there are just amrs idle (never utilized), will be negative..is this okay?
         
 
@@ -132,7 +132,7 @@ class Metrics:
         print(f"Total picker idle time: {self.human_idle/60:.2f} min")
         print(f"Human wait time for AMR: {self.human_wait_for_amr/60:.2f} min")
         print(f"Total AMR idle time: {self.amr_idle/60:.2f} min")
-        print(f"AMR utilization: {amr_util:.2f}%")
+        print(f"Average AMR utilization: {amr_util:.2f}%")
         print(f"Avg perishable exposure time: {avg_exposure/60:.2f} min")
         print(f"Spoiled perishables: {spoiled_pct:.2f}%")
         print(f"Throughput: {throughput:.2f} orders/hour")

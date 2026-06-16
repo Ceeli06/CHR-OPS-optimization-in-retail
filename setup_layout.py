@@ -80,7 +80,7 @@ def distance_map(grid, start):
             if (
                 0 <= nr < rows and
                 0 <= nc < cols and
-                grid[nr, nc] == "." and 
+                (grid[nr, nc] == "." or grid[nr,nc] == "S") and 
                 dist[nr, nc] == -1
             ):
                 dist[nr, nc] = dist[r, c] + 1
@@ -135,7 +135,9 @@ def path_distance(path, dist_map):
     for i in range(len(path) - 1):
         start = path[i]
         end = path[i + 1]
-        total += dist_map[start][end[0], end[1]]
+        length = dist_map[start][end[0], end[1]]
+        if length > 0:
+            total += length
 
     return total
 
@@ -154,9 +156,3 @@ def get_path(orders, dist_map, staging, map):
     totalRoute = front + end[1:]
     totalRoute.append(staging)
     return totalRoute
-
-layout = setup_medium()
-distmap = all_distance_maps(layout)
-map = map_of_coords(layout)
-path = get_path([(0,2), (2,0)], distmap, (2,0), map)
-print(path)
