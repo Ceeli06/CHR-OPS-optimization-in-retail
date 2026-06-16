@@ -85,7 +85,7 @@ class FollowSim(models.Simulation):
         route = self.build_route(batch.orders)
         travel_distance = path_distance(route, self.dist_map)
         human_travel_time = travel_distance / params.WALKING_SPEED
-        amr_travel_time = travel_distance / params.AMR_SPEED + self.customer_collisions(route)
+        amr_travel_time = travel_distance / params.AMR_SPEED
 
         time_cursor = self.time + max(human_travel_time, amr_travel_time) # Holds time from batch start to end
 
@@ -169,7 +169,6 @@ if __name__ == "__main__":
 
     pickers = [models.Picker(i, staging) for i in range(params.num_pickers)]
     amrs = [models.AMR(i, staging) for i in range(params.num_robots)]
-    customers = [models.Customer(i, staging) for i in range(params.num_customers)]
 
-    sim = FollowSim(orders, pickers, amrs, coord_map, staging=staging, dist_map=dist_map, customers=customers, layout=layout)
+    sim = FollowSim(orders, pickers, amrs, coord_map, staging=staging, dist_map=dist_map)
     sim.run()
