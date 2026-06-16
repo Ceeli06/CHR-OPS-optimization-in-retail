@@ -1,6 +1,3 @@
-# Discrete-event simulation for a manual (human-only) retail order picking policy.
-# Orders arrive via Poisson process, are batched (6-8 per cart), 
-# assigned to a picker, and routed using a greedy nearest-neighbor heuristic algorithm
 
 import params
 import heapq
@@ -71,9 +68,9 @@ class AMR:
 # A set of orders grouped together for one picker to handle (6-8 per cart for manual)
 @dataclass
 class Batch:
-    orders: list
-    picker_id: int
-    amr_id: int
+    orders: list[list]
+    picker_id: list[int]
+    amr_id: list[int]
 
 
 # Utilities to collect and print key performance metrics at end of simulation
@@ -111,7 +108,7 @@ class Metrics:
         throughput = self.total_orders / (sim_time / 3600) if sim_time > 0 else 0.0
 
         # AMR utilization (ignored for manual policy since AMR not used)
-        amr_util = ((sim_time - ((self.amr_idle)/params.num_robots)) / sim_time) * 100 if sim_time > 0 else 0.0
+        amr_util = ((sim_time - self.amr_idle) / sim_time) * 100 if sim_time > 0 else 0.0
         # NOTE: above breaks down when there are just amrs idle (never utilized), will be negative..is this okay?
         
 
@@ -132,7 +129,7 @@ class Metrics:
         print(f"Total picker idle time: {self.human_idle/60:.2f} min")
         print(f"Human wait time for AMR: {self.human_wait_for_amr/60:.2f} min")
         print(f"Total AMR idle time: {self.amr_idle/60:.2f} min")
-        print(f"Average AMR utilization: {amr_util:.2f}%")
+        print(f"AMR utilization: {amr_util:.2f}%")
         print(f"Avg perishable exposure time: {avg_exposure/60:.2f} min")
         print(f"Spoiled perishables: {spoiled_pct:.2f}%")
         print(f"Throughput: {throughput:.2f} orders/hour")
@@ -141,7 +138,7 @@ class Metrics:
 # Parent simulation class that policy-specific simulations inherit from
 @dataclass
 class Simulation:
-    def __init__(self, orders, pickers, amrs, coord_map, staging=(0, 0), dist_map=None):
+    def __init__(self, orders, pickers, amrs, coord_map, layout, staging=(0, 0), dist_map=None):
         self.time = 0.0
         self.event_queue = []  # Event queue containing: (time, counter, event_type, payload)
         self.event_counter = 0  # Used so events with same arrival_time process FIFO
@@ -154,6 +151,7 @@ class Simulation:
 
         self.staging = staging
         self.dist_map = dist_map
+        self.layout = layout
         self.metrics = Metrics()
         self.map = coord_map
 

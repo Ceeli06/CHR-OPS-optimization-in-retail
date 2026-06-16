@@ -1,17 +1,53 @@
-﻿# Discrete-event simulation for a manual (human-only) retail order picking policy.
-# Orders arrive via Poisson process, are batched (6-8 per cart), 
-# assigned to a picker, and routed using a greedy nearest-neighbor heuristic algorithm
-
 import params
-import models
-from dataclasses import dataclass
+import models2
 from orderGen import generate_orders
-from setup_layout import setup_medium, map_of_coords, path_distance, all_distance_maps, get_path
+from setup_layout import setup_medium, map_of_coords, get_path, path_distance, all_distance_maps
 
 # Main DES simulation, where time advances only when events occur (arrivals, dispatches, completions)
-class ManualSim(models.Simulation):
-    # Decides batch size, then returns a batch of that size created via. select_similar_batch
-    def create_batch(self, picker, force=False):
+class ZoneWait(models2.Simulation):
+    def __init__(self, orders, pickers,amrs, coord_map, layout, staging=(0, 0), dist_map=None):
+        super().__init__(
+            orders,
+            pickers,
+            amrs,
+            coord_map,
+            layout,
+            staging=staging,
+            dist_map=dist_map
+        )
+
+        self.zoneMap = self.build_zone_map()
+        print(self.zoneMap)
+        print(orders)
+        print(coord_map)
+
+        
+    def build_zone_map(self):
+        rows, cols = self.layout.shape
+
+        num_pickers = len(self.pickers)
+        zone_width = cols / num_pickers
+
+        zone_map = {}
+
+
+        for r in range(rows):
+            for c in range(cols):
+
+                if self.layout[r, c] not in [".", "S"]:
+                    continue
+                
+
+                picker_id = min(
+                    int(c / zone_width),
+                    num_pickers - 1
+                )
+
+                zone_map[(r, c)] = picker_id
+
+        return zone_map
+
+    def create_batch(self, picker, amr, force=False):
         if not self.pending_orders:
             return None
         if not force and len(self.pending_orders) < params.BATCH_SIZE_MIN:
@@ -19,12 +55,20 @@ class ManualSim(models.Simulation):
 
         batch_size = min(len(self.pending_orders), params.BATCH_SIZE_MAX)
         batch_orders, self.pending_orders = self.select_similar_batch(batch_size)
+        amrId = None
+        if (amr):
+            amrId = amr.id
 
-        return models.Batch(orders=batch_orders, picker_id=picker.id, amr_id = None)
+        return models2.Batch(orders=batch_orders, picker_id=picker.id, amr_id = amrId)
 
-    # Greedy orrder assignment, picking whichever picker becomes available earliest
+    # Greedy order assignment, picking whichever picker becomes available earliest
     def select_picker(self):
         return min(self.pickers, key=lambda p: p.available_time)
+    
+    def select_amr(self):
+        if len(self.amrs) == 0:
+            return
+        return min(self.amrs, key=lambda p: p.available_time) 
 
     # Build a nearest-neighbor route for the batch from staging through all item locations and back
     def build_route(self, orders):
@@ -60,22 +104,30 @@ class ManualSim(models.Simulation):
         # Check picker availability before pulling orders from pending_orders,
         # so a busy picker doesn't cause orders to be lost on reschedule
         picker = self.select_picker()
-        if picker.available_time > self.time:
-            self.schedule(picker.available_time, "BATCH_DISPATCH", payload)
+        amr = self.select_amr()
+
+        # Schedules batch dispatch in the future if picker and/or AMR not available and returns 
+        if picker.available_time > self.time or (amr != None and amr.available_time > self.time):
+            time = 0
+            if (amr):
+                time = amr.available_time
+            self.schedule(max(picker.available_time, time), "BATCH_DISPATCH", payload)
             return
 
-        batch = self.create_batch(picker, force=force)
+        batch = self.create_batch(picker, amr, force=force)
         if batch is None: # Invalid batch-catching
             return
 
         picker.mark_busy(self.time)
+        if (amr):
+            amr.mark_busy(self.time)
 
         route = self.build_route(batch.orders)
         travel_distance = path_distance(route, self.dist_map)
-        travel_time = travel_distance / params.WALKING_SPEED 
-        
+        human_travel_time = travel_distance / params.WALKING_SPEED
+        amr_travel_time = travel_distance / params.AMR_SPEED
 
-        time_cursor = self.time + travel_time # Holds time from batch start to end
+        time_cursor = self.time + max(human_travel_time, amr_travel_time) # Holds time from batch start to end
 
         # Map each location to the orders that have items there
         coord_orders = {}
@@ -98,8 +150,10 @@ class ManualSim(models.Simulation):
             orders_at_node = coord_orders.get(node, [])
             if not orders_at_node:
                 continue
-
-            pick_duration = len(orders_at_node) * params.HUMAN_PICK_TIME
+            if (amr):
+                pick_duration = len(orders_at_node) * params.AMR_LOAD_TIME
+            else: 
+                pick_duration = len(orders_at_node) * params.HUMAN_PICK_TIME
             if pick_duration > 0:
                 time_cursor += pick_duration # Update batch time every pick
 
@@ -120,10 +174,14 @@ class ManualSim(models.Simulation):
         # Update walking distance of picker and global total
         picker.distance_walked += travel_distance
         self.metrics.human_distance += travel_distance
+        self.metrics.human_wait_for_amr = max(0, amr_travel_time - human_travel_time)
+        self.metrics.human_idle += max(0, amr_travel_time - human_travel_time)
 
         # Update picker avalible time and schedule a pick complete event
         finish_time = time_cursor
         picker.available_time = finish_time
+        if (amr):
+            amr.available_time = finish_time
         self.schedule(finish_time, "PICK_COMPLETE", batch)
 
 # Main experimentation space where testing occurs
@@ -134,9 +192,9 @@ if __name__ == "__main__":
     staging = coord_map["S"][0]
 
     # Precompute list of orders
-    raw_orders = generate_orders(coord_map, layout, params.SIM_TIME, params.ORDER_ARRIVAL_RATE)
+    raw_orders = generate_orders(coord_map, params.SIM_TIME, params.ORDER_ARRIVAL_RATE)
     orders = [
-        models.Order(
+       models2.Order(
             id=raw_order["order_id"],
             arrival_time=raw_order["arrival_time"],
             items=raw_order["items"],
@@ -149,8 +207,8 @@ if __name__ == "__main__":
         for raw_order in raw_orders
     ]
 
-    pickers = [models.Picker(i, staging) for i in range(params.num_pickers)]
-    amrs = [models.AMR(i, staging) for i in range(params.num_robots)]
+    pickers = [models2.Picker(i, staging) for i in range(params.num_pickers)]
+    amrs = [models2.AMR(i, staging) for i in range(params.num_robots)]
 
-    sim = ManualSim(orders, pickers, amrs, coord_map, staging=staging, dist_map=dist_map)
+    sim = ZoneWait(orders, pickers, amrs, coord_map, layout, staging=staging, dist_map=dist_map)
     sim.run()

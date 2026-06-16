@@ -80,7 +80,7 @@ def distance_map(grid, start):
             if (
                 0 <= nr < rows and
                 0 <= nc < cols and
-                grid[nr, nc] != "" and  # Non-empty (not a boundary)
+                (grid[nr, nc] == "." or grid[nr,nc] == "S") and 
                 dist[nr, nc] == -1
             ):
                 dist[nr, nc] = dist[r, c] + 1
@@ -114,15 +114,13 @@ def nearest_neighbor(orders, dist_map, staging):
         for node in unvisited:
             d = dist_map[current][node[0], node[1]]
 
-            if d == -1:  # Unreachable
-                continue
-
-            if d < best_dist:
+            if d < best_dist and d != -1:
                 best_dist = d
                 best_node = node
 
-        if best_node is None:  # No reachable nodes remain
+        if best_node is None:
             break
+            
 
         path.append(best_node)
         unvisited.remove(best_node)
@@ -137,7 +135,9 @@ def path_distance(path, dist_map):
     for i in range(len(path) - 1):
         start = path[i]
         end = path[i + 1]
-        total += dist_map[start][end[0], end[1]]
+        length = dist_map[start][end[0], end[1]]
+        if length > 0:
+            total += length
 
     return total
 

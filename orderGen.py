@@ -30,7 +30,7 @@ def generate_order_helper():
     }
 
 # Gets and returns a list of coordinates for each item in an order
-def generate_order_coords(items, coord_map):
+def generate_order_coords(items, coord_map, layout):
     coords = []
     for item in items:
         department = item["department"]
@@ -46,9 +46,37 @@ def generate_order_coords(items, coord_map):
             )
         # For each item, pick a random location in that department
         for _ in range(quantity):
-            coords.append(random.choice(possible_coords))
+            coord = random.choice(possible_coords)
+            coord = convert_to_walkable(coord, layout) # converts the unwalkable aisle location to an actual walkable location for the picker to go to
+            coords.append(coord)
+
     return coords
 
+def convert_to_walkable(coord, layout):
+    r, c = coord
+    rows, cols = layout.shape
+
+    # Already walkable
+    if layout[r, c] == ".":
+        return (r, c)
+
+    directions = [
+        (-1, 0),  # up
+        (1, 0),   # down
+        (0, -1),  # left
+        (0, 1),   # right
+    ]
+
+    for dr, dc in directions:
+        nr, nc = r + dr, c + dc
+
+        if (
+            0 <= nr < rows and
+            0 <= nc < cols and
+            layout[nr, nc] == "."
+        ):
+            return (nr, nc)
+        
 # Generate random order arrival times using a Poisson process (with exponential inter arrival times)
 def generate_order_arrival_times(sim_time, arrival_rate):
     times = []
@@ -66,9 +94,9 @@ def generate_order_arrival_times(sim_time, arrival_rate):
     return times # Return all arrival times of entire sim
 
 # Generates a complete order with items, store coordinates, and arrival time
-def generate_order(coord_map, arrival_time=None):
+def generate_order(coord_map, layout, arrival_time=None):
     order = generate_order_helper()
-    coords = generate_order_coords(order["items"], coord_map)
+    coords = generate_order_coords(order["items"], coord_map, layout)
 
     return {
         "visit_id": order["visit_id"],
@@ -78,12 +106,12 @@ def generate_order(coord_map, arrival_time=None):
     }
 
 # Generate all orders for the entire simulation, sorted by arrival time as a list
-def generate_orders(coord_map, sim_time, arrival_rate):
+def generate_orders(coord_map, sim_time, layout, arrival_rate):
     arrival_times = generate_order_arrival_times(sim_time, arrival_rate)
     orders_list = []
 
     for order_id, arrival_time in enumerate(arrival_times):
-        order = generate_order(coord_map, arrival_time=arrival_time)
+        order = generate_order(coord_map, layout, arrival_time=arrival_time)
         order["order_id"] = order_id
         orders_list.append(order)
 

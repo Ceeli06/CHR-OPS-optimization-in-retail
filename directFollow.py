@@ -18,7 +18,8 @@ class FollowSim(models.Simulation):
         if (amr):
             amrId = amr.id
 
-        return models.Batch(orders=batch_orders, picker_id=picker.id, amr_id = amrId)
+        batch = models.Batch(orders=batch_orders, picker_id = picker.id, amr_id = amrId)
+        return batch
 
     # Greedy order assignment, picking whichever picker becomes available earliest
     def select_picker(self):
@@ -133,6 +134,8 @@ class FollowSim(models.Simulation):
         # Update walking distance of picker and global total
         picker.distance_walked += travel_distance
         self.metrics.human_distance += travel_distance
+        self.metrics.human_wait_for_amr = max(0, amr_travel_time - human_travel_time)
+        self.metrics.human_idle += max(0, amr_travel_time - human_travel_time)
 
         # Update picker avalible time and schedule a pick complete event
         finish_time = time_cursor
@@ -149,7 +152,7 @@ if __name__ == "__main__":
     staging = coord_map["S"][0]
 
     # Precompute list of orders
-    raw_orders = generate_orders(coord_map, params.SIM_TIME, params.ORDER_ARRIVAL_RATE)
+    raw_orders = generate_orders(coord_map, params.SIM_TIME, layout, params.ORDER_ARRIVAL_RATE)
     orders = [
        models.Order(
             id=raw_order["order_id"],
