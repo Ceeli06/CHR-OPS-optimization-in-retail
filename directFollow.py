@@ -84,7 +84,6 @@ class FollowSim(models.Simulation):
 
         route = self.build_route(batch.orders)
         travel_distance = path_distance(route, self.dist_map)
-        print("dist", travel_distance)
         human_travel_time = travel_distance / params.WALKING_SPEED
         amr_travel_time = travel_distance / params.AMR_SPEED
 
