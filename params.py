@@ -1,11 +1,8 @@
-"""Parameters"""
-
-num_pickers = 3
-num_robots = 3
-num_customers = 1  # Representative of store congestion
-pLambda = (
-    30.0  # Lambda for arrivalTimeGen's Poisson process (pLambda DOWN == orderChance UP)
-)
+'''Parameters'''
+num_pickers = 1
+num_robots = 1
+num_customers = 100  # Representative of store congestion
+pLambda = 300.0 # Lambda for arrivalTimeGen's Poisson process (pLambda DOWN == orderChance UP)
 
 """Constants"""
 # Average number of orders per second (avg. 1 order per "pLambda" seconds)
@@ -21,9 +18,12 @@ AMR_LOAD_TIME = 10  # Seconds to load one item
 AMR_UNLOAD_TIME = 10  # Seconds to unload one item
 AMR_CAPACITY = 10  # Maximum AMR item capacity per trip
 AMR_SPEED = 1.5  # AMR speed in meters per second
-BATCH_SIZE_MIN = 6  # Minimum number of orders per batch (group) in batching policies
-BATCH_SIZE_MAX = 8  # Maximum number of order per batch (group) in batching policies
-SIM_TIME = 8 * 60 * 60  # Simulates 8 hour workday
+CUSTOMER_SPEED = 0.8 # customer speed in meters per second
+CUSTOMER_BROWSE_TIME = 15 # Time a customer spends at each item coord browsing
+CUSTOMER_COLLISION_TIME = 10 # Time AMR pauses upon colliding with a customer
+BATCH_SIZE_MIN = 6 # Minimum number of orders per batch (group) in batching policies
+BATCH_SIZE_MAX = 8 # Maximum number of order per batch (group) in batching policies
+SIM_TIME = 8 * 60 * 60 # Simulates 8 hour workday
 # Orders waiting longer than this are forceed into the next batch
 SIMILARITY_BATCH_MAX_WAIT = 90 * 60  # 1.5 hours
 # If the pending queue has been non-empty this long without reaching BATCH_SIZE_MIN, force a dispatch

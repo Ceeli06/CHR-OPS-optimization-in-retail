@@ -1,6 +1,7 @@
 import params
 import heapq
 from dataclasses import dataclass
+from orderGen import generate_order_helper, generate_order_coords
 
 
 # A customer order with items to be picked from the store
@@ -65,6 +66,13 @@ class AMR:
         if not self.is_idle:
             self.is_idle = True
             self.idle_start = current_time
+
+@dataclass
+class Customer:
+    id: int
+    location: tuple # current position of customer
+    shopping_coords: set = None # current order coords
+    available_time: float = 0.0 # when current order is finished
 
 
 # A set of orders grouped together for one picker to handle (6-8 per cart for manual)
@@ -166,7 +174,7 @@ class Metrics:
 # Parent simulation class that policy-specific simulations inherit from
 @dataclass
 class Simulation:
-    def __init__(self, orders, pickers, amrs, coord_map, staging=(0, 0), dist_map=None):
+    def __init__(self, orders, pickers, amrs, coord_map, staging=(0, 0), dist_map=None, customers=None, layout=None):
         self.time = 0.0
         self.event_queue = (
             []
@@ -178,15 +186,22 @@ class Simulation:
 
         self.pickers = pickers
         self.amrs = amrs  # Unused in manual policy
+        self.customers = customers or []
+
 
         self.staging = staging
         self.dist_map = dist_map
+        self.layout = layout
         self.metrics = Metrics()
         self.map = coord_map
 
         # Sets up event queue for scheduling order events
         for order in self.orders:
             self.schedule(order.arrival_time, "ORDER_ARRIVAL", order)
+        
+        # Schedules customer arrivals and initial orders
+        for customer in self.customers:
+            self.schedule(0.0, "CUSTOMER_SHOPPING_COMPLETE", customer)
 
         self.schedule(params.SIM_TIME, "SIM_END_FLUSH", None)
 
@@ -216,6 +231,8 @@ class Simulation:
                 self.handle_batch(payload)
             elif event_type == "PICK_COMPLETE":
                 self.handle_pick_complete(payload)
+            elif event_type == "CUSTOMER_SHOPPING_COMPLETE":
+                self.handle_customer_shopping(payload)
             elif event_type == "SIM_END_FLUSH":
                 self.handle_end_flush()
 
@@ -244,6 +261,42 @@ class Simulation:
     def handle_end_flush(self):
         if self.pending_orders:
             self.schedule(self.time, "BATCH_DISPATCH", {"final": True})
+
+    # Customer generates a new random shopping order and walks it at CUSTOMER_SPEED, adding browse
+    # time at each stop, then immediately schedules another trip when done
+    def handle_customer_shopping(self, customer):
+        if self.dist_map is None or self.layout is None:
+            return
+
+        order = generate_order_helper()
+        coords = generate_order_coords(order["items"], self.map, self.layout)
+        if not coords:
+            self.schedule(self.time + 60.0, "CUSTOMER_SHOPPING_COMPLETE", customer)
+            return
+
+        route = [customer.location] + coords
+        travel_distance = sum(
+            self.dist_map[route[i]][route[i + 1][0], route[i + 1][1]]
+            for i in range(len(route) - 1)
+        )
+        travel_time = travel_distance / params.CUSTOMER_SPEED
+        browse_time = len(coords) * params.CUSTOMER_BROWSE_TIME
+        total_time = max(travel_time + browse_time, 1.0)
+
+        customer.shopping_coords = set(coords)
+        customer.location = coords[-1]
+        customer.available_time = self.time + total_time
+        self.schedule(customer.available_time, "CUSTOMER_SHOPPING_COMPLETE", customer)
+
+    # Checks all customer paths for the batch with the AMRs route and returns 
+    # the total pause time from collisions with customers sharing an item location somewhere on their path
+    def customer_collisions(self, route_waypoints):
+        route_set = set(route_waypoints)
+        pause = 0.0
+        for customer in self.customers:
+            if customer.shopping_coords and (customer.shopping_coords & route_set):
+                pause += params.CUSTOMER_COLLISION_TIME
+        return pause
 
     # Helper that returns a set of all department names in an order
     def department_set(self, order):
