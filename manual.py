@@ -134,7 +134,7 @@ if __name__ == "__main__":
     staging = coord_map["S"][0]
 
     # Precompute list of orders
-    raw_orders = generate_orders(coord_map, layout, params.SIM_TIME, params.ORDER_ARRIVAL_RATE)
+    raw_orders = generate_orders(coord_map, params.SIM_TIME, layout, params.ORDER_ARRIVAL_RATE)
     orders = [
         models.Order(
             id=raw_order["order_id"],
