@@ -1,11 +1,52 @@
 import params
-import models
+import models2
 from orderGen import generate_orders
 from setup_layout import setup_medium, map_of_coords, get_path, path_distance, all_distance_maps
 
 # Main DES simulation, where time advances only when events occur (arrivals, dispatches, completions)
-class FollowSim(models.Simulation):
-    # Decides batch size, then returns a batch of that size created via. select_similar_batch
+class ZoneWait(models2.Simulation):
+    def __init__(self, orders, pickers,amrs, coord_map, layout, staging=(0, 0), dist_map=None):
+        super().__init__(
+            orders,
+            pickers,
+            amrs,
+            coord_map,
+            layout,
+            staging=staging,
+            dist_map=dist_map
+        )
+
+        self.zoneMap = self.build_zone_map()
+        print(self.zoneMap)
+        print(orders)
+        print(coord_map)
+
+        
+    def build_zone_map(self):
+        rows, cols = self.layout.shape
+
+        num_pickers = len(self.pickers)
+        zone_width = cols / num_pickers
+
+        zone_map = {}
+
+
+        for r in range(rows):
+            for c in range(cols):
+
+                if self.layout[r, c] not in [".", "S"]:
+                    continue
+                
+
+                picker_id = min(
+                    int(c / zone_width),
+                    num_pickers - 1
+                )
+
+                zone_map[(r, c)] = picker_id
+
+        return zone_map
+
     def create_batch(self, picker, amr, force=False):
         if not self.pending_orders:
             return None
@@ -18,9 +59,7 @@ class FollowSim(models.Simulation):
         if (amr):
             amrId = amr.id
 
-        batch = models.Batch(orders=batch_orders, picker_id = picker.id, amr_id = amrId)
-        #print(batch)
-        return batch
+        return models2.Batch(orders=batch_orders, picker_id=picker.id, amr_id = amrId)
 
     # Greedy order assignment, picking whichever picker becomes available earliest
     def select_picker(self):
@@ -37,13 +76,11 @@ class FollowSim(models.Simulation):
         for order in orders:
             coords.extend(order.coords)
 
-        coords = [(0,10)]
         unique_coords = list(dict.fromkeys(coords))
         if not unique_coords:
             return [self.staging]
 
         route = get_path(unique_coords, self.dist_map, self.staging, self.map)
-        print(route)
         if not route or route[-1] != self.staging:
             route.append(self.staging)
 
@@ -157,7 +194,7 @@ if __name__ == "__main__":
     # Precompute list of orders
     raw_orders = generate_orders(coord_map, params.SIM_TIME, params.ORDER_ARRIVAL_RATE)
     orders = [
-       models.Order(
+       models2.Order(
             id=raw_order["order_id"],
             arrival_time=raw_order["arrival_time"],
             items=raw_order["items"],
@@ -170,8 +207,8 @@ if __name__ == "__main__":
         for raw_order in raw_orders
     ]
 
-    pickers = [models.Picker(i, staging) for i in range(params.num_pickers)]
-    amrs = [models.AMR(i, staging) for i in range(params.num_robots)]
+    pickers = [models2.Picker(i, staging) for i in range(params.num_pickers)]
+    amrs = [models2.AMR(i, staging) for i in range(params.num_robots)]
 
-    sim = FollowSim(orders, pickers, amrs, coord_map, staging=staging, dist_map=dist_map)
+    sim = ZoneWait(orders, pickers, amrs, coord_map, layout, staging=staging, dist_map=dist_map)
     sim.run()
