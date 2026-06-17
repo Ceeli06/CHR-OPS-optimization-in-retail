@@ -310,7 +310,7 @@ class Simulation:
         # Update picker
         picker = self.pickers[batch.picker_id]
         picker.mark_idle(self.time)
-        if batch.amr_id:
+        if batch.amr_id is not None:
             amr = self.amrs[batch.amr_id]
             amr.mark_idle(self.time)
 

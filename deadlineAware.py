@@ -211,17 +211,15 @@ class DeadlineSim(models.Simulation):
                         and node in order.perishable_coords):
                     order.perishable_picked_at = time_cursor - pick_duration
                 decrement = sum(1 for coord in order.coords if coord == node)
-                order.items_remaining -= decrement # Decrement items remaining in batch
-                if order.items_remaining <= 0 and order.completion_time is None:
-                    order.completion_time = time_cursor
-
+                order.items_remaining -= decrement 
 
         last_item_location = self.staging
         if (route):
             last_item_location = route[-1]
-        
+
         picker.location = last_item_location # Picker ends the order at the last item location
         picker.available_time = time_cursor
+        picker.mark_idle(time_cursor) # Picker is free the instant picking ends, not when the AMR later reaches staging
 
         total_human_distance = picker_to_start_dist + picking_distance
         picker.distance_walked += total_human_distance
@@ -232,11 +230,12 @@ class DeadlineSim(models.Simulation):
             amr_return_dist = path_distance([last_item_location, self.staging], self.dist_map)
             amr_return_time = amr_return_dist / params.AMR_SPEED
             amr.available_time = time_cursor + amr_return_time
-            
-            total_amr_distance = amr_to_start_dist + picking_distance + amr_return_dist 
-            self.metrics.amr_distance += total_amr_distance
 
-        self.schedule(time_cursor, "PICK_COMPLETE", batch)
+            total_amr_distance = amr_to_start_dist + picking_distance + amr_return_dist
+            self.metrics.amr_distance += total_amr_distance
+            self.schedule(time_cursor + amr_return_time, "PICK_COMPLETE", batch)
+        else:
+            self.schedule(time_cursor, "PICK_COMPLETE", batch)
 
 # Main experimentation space where testing occurs
 if __name__ == "__main__":
