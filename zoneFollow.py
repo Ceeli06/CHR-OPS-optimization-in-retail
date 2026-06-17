@@ -7,6 +7,7 @@ from setup_layout import (
     get_path,
     all_distance_maps,
     path_distance,
+    zone_amr_dist,
 )
 from collections import defaultdict
 import math
@@ -160,7 +161,7 @@ class ZoneWait(models2.Simulation):
         if amr and amr.available_time > self.time:
             self.schedule(amr.available_time, "BATCH_DISPATCH", payload)
             return
-        #first picker check, maybe check last picker instead? ** NOTE ***
+        #first picker check
         if self.pickers[0].available_time > self.time:
             self.schedule(self.pickers[0].available_time, "BATCH_DISPATCH", payload)
             return
@@ -176,8 +177,8 @@ class ZoneWait(models2.Simulation):
         #    p.mark_busy(self.time)
 
         route = self.build_zoning_route(batch.zoned_orders) #doesn't include start: staging and end: staging
-        human_travel_distance = sum(path_distance(zonePath, self.dist_map) for zonePath in route.values())
-
+        human_travel_distance = sum(path_distance(zonePath, self.dist_map) for zonePath in route.values()) 
+        amr_travel_distance = zone_amr_dist(route, self.dist_map, self.staging) + human_travel_distance
 
         # sets up coordinate to order # (used later in metrics determination)
         coord_orders = {}
@@ -200,9 +201,12 @@ class ZoneWait(models2.Simulation):
         picker_finish_times = {}
 
         for zone_id, zonePath in route.items():
-
+            
             picker = self.pickers[zone_id]
             start_time = max(self.time, max(picker.available_time, amr.available_time))
+            human_wait_for_amr = max(0, picker.available_time - amr.available_time)
+            amr_wait_for_human = max(0, amr.available_time - picker.available_time)
+
             picker_time = start_time
 
             picker.mark_busy(start_time)
@@ -221,7 +225,7 @@ class ZoneWait(models2.Simulation):
                     continue
 
                 if zoneFollow:
-                    pick_duration = len(orders_at_node) * params.AMR_LOAD_TIME
+                    pick_duration = len(orders_at_node) * params.AMR_LOAD_TIME #directly load onto AMR
                 else:
                     pick_duration = len(orders_at_node) * (params.HUMAN_PICK_TIME + params.AMR_LOAD_TIME) # accounts for moving items to AMR @ end
 
@@ -247,91 +251,21 @@ class ZoneWait(models2.Simulation):
             # walking from last picking point to handoff point
             r, c = self.handoffPoints[zone_id]
             dist_last_to_zone_center = dist_map[prev_node][r,c]
-            picker_time += dist_last_to_zone_center / params.WALKING_SPEED
+            picker_time += dist_last_to_zone_center / (min(params.WALKING_SPEED, params.AMR_SPEED))
             picker.available_time = picker_time
+            time_to_get_to_next_point = [self.handoffPoints[zone_id], self.handoffPoints[zone_id -1]]
+            amr.available_time = picker_time + time_to_get_to_next_point
             picker_finish_times[zone_id]= picker_time
             picker.mark_idle(self.time)
+            self.metrics.amr_wait_for_human += amr_wait_for_human
+            self.metrics.human_wait_for_amr += human_wait_for_amr
 
-        # Deals w/ AMR wait time & metrics
-        amr_wait_time = 0
-        human_wait_time = 0
-
-        if amr and route and not zoneFollow:
-            #amr visits the furthest zone first then comes back to the zone containing perishables last
-            zone_ids = sorted(route.keys())
-            amr_time = self.time
-
-            # staging -> first zone
-            first_zone = zone_ids[0]
-
-            travel_dist = path_distance(
-                [self.staging, self.handoffPoints[first_zone]],
-                self.dist_map
-            )
-
-            amr_time += travel_dist / params.AMR_SPEED
-
-            # visit zones sequentially
-            for idx, zone_id in enumerate(zone_ids):
-
-                picker_finish = picker_finish_times[zone_id]
-
-                if amr_time < picker_finish:
-                    # AMR arrived before picker finished
-                    wait = picker_finish - amr_time
-                    amr_wait_time += wait
-                    amr_time += wait
-
-                else:
-                    # Picker finished before AMR arrived
-                    human_wait_time += amr_time - picker_finish
-
-                # Handoff/loading time
-                amr_time += params.AMR_LOAD_TIME
-
-                # Travel to next zone
-                if idx < len(zone_ids) - 1:
-
-                    next_zone = zone_ids[idx + 1]
-
-                    travel_dist = path_distance(
-                        [
-                            self.handoffPoints[zone_id],
-                            self.handoffPoints[next_zone]
-                        ],
-                        self.dist_map
-                    )
-
-                    amr_time += travel_dist / params.AMR_SPEED
-
-            # Last zone -> staging
-            last_zone = zone_ids[-1]
-
-            travel_dist = path_distance(
-                [self.handoffPoints[last_zone], self.staging],
-                self.dist_map
-            )
-
-            amr_time += travel_dist / params.AMR_SPEED
-
-            amr_finish_time = amr_time
-            amr.available_time = amr_finish_time
-
-        else:
-            # zone-follow mode or no AMR
-            amr_finish_time = max(
-                picker_finish_times.values(),
-                default=self.time
-            )
-
-        self.metrics.amr_wait_for_human += amr_wait_time
+        amr_finish_time = max(picker_finish_times.values())
+        
         self.metrics.human_distance += human_travel_distance
-        self.metrics.human_wait_for_amr += human_wait_time
         self.metrics.human_idle += self.metrics.human_wait_for_amr
-        finish_time = max(
-            max(picker_finish_times.values(), default=self.time),
-            amr_finish_time
-        )
+        finish_time = max(picker_finish_times.values(), default=self.time)
+        
         for order in batch.orders:
             if order.items_remaining <= 0 and order.completion_time is None:
                 order.completion_time = finish_time

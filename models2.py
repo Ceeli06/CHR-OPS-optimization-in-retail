@@ -203,7 +203,7 @@ class Simulation:
             if event_type == "ORDER_ARRIVAL":
                 self.handle_order_arrival(payload)
             elif event_type == "BATCH_DISPATCH":
-                self.handle_batch(payload, None)
+                self.handle_batch(payload, True) #NOTE: TRUE HERE FOR FOLLOWBASED
             elif event_type == "PICK_COMPLETE":
                 self.handle_pick_complete(payload)
             elif event_type == "SIM_END_FLUSH":
