@@ -156,7 +156,7 @@ class Metrics:
 @dataclass
 class Simulation:
     def __init__(
-        self, orders, pickers, amrs, coord_map, layout, staging=(0, 0), dist_map=None
+        self, orders, pickers, amrs, coord_map, layout, zoneFollow, staging=(0, 0), dist_map=None
     ):
         self.time = 0.0
         self.event_queue = (
@@ -175,6 +175,7 @@ class Simulation:
         self.layout = layout
         self.metrics = Metrics()
         self.map = coord_map
+        self.zoneFollow = zoneFollow
 
         # Sets up event queue for scheduling order events
         for order in self.orders:
@@ -205,7 +206,7 @@ class Simulation:
             if event_type == "ORDER_ARRIVAL":
                 self.handle_order_arrival(payload)
             elif event_type == "BATCH_DISPATCH":
-                self.handle_batch(payload, True)  # NOTE: TRUE HERE FOR FOLLOWBASED
+                self.handle_batch(payload, self.zoneFollow)  # NOTE: TRUE HERE FOR FOLLOWBASED
             elif event_type == "PICK_COMPLETE":
                 self.handle_pick_complete(payload)
             elif event_type == "SIM_END_FLUSH":

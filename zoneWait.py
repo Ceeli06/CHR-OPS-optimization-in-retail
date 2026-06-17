@@ -18,7 +18,7 @@ class ZoneWait(models2.Simulation):
         self, orders, pickers, amrs, coord_map, layout, staging=(0, 0), dist_map=None
     ):
         super().__init__(
-            orders, pickers, amrs, coord_map, layout, staging=staging, dist_map=dist_map
+            orders, pickers, amrs, coord_map, layout, False, staging=staging, dist_map=dist_map
         )
 
         self.zoneMap = self.coordinate_zoning(layout, coord_map)
