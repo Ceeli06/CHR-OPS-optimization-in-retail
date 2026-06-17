@@ -95,7 +95,7 @@ class DeadlineSim(models.Simulation):
         
         # New route starts directly from current location for pickers or from staging for amrs
         route = get_path(unique_coords, self.dist_map, start_node, self.map)
-        return route
+        return route[:-1]
 
     # Main order handling function which routes a batch, computes pick times, and schedules its completion
     def handle_batch(self, payload):
