@@ -259,7 +259,7 @@ class ZoneWait(models2.Simulation):
             picker.available_time = picker_time
             amr.available_time = picker_time
             picker_finish_times[zone_id]= picker_time
-            picker.mark_idle(self.time)
+            picker.mark_idle(picker_time)
             self.metrics.amr_wait_for_human += amr_wait_for_human
             self.metrics.human_wait_for_amr += human_wait_for_amr
             old_zone_id = zone_id
