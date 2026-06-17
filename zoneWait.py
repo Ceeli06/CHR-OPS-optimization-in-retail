@@ -257,7 +257,7 @@ class ZoneWait(models2.Simulation):
 
         if amr and route and not zoneFollow:
             #amr visits the furthest zone first then comes back to the zone containing perishables last
-            zone_ids = sorted(route.keys())
+            zone_ids = sorted(route.keys(), reverse=True)
             amr_time = self.time
 
             # staging -> first zone
