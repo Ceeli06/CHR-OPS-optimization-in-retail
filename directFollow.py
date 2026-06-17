@@ -1,7 +1,14 @@
 import params
 import models
 from orderGen import generate_orders
-from setup_layout import setup_medium, map_of_coords, get_path, path_distance, all_distance_maps
+from setup_layout import (
+    setup_medium,
+    map_of_coords,
+    get_path,
+    path_distance,
+    all_distance_maps,
+)
+
 
 # Main DES simulation, where time advances only when events occur (arrivals, dispatches, completions)
 class FollowSim(models.Simulation):
@@ -15,20 +22,20 @@ class FollowSim(models.Simulation):
         batch_size = min(len(self.pending_orders), params.BATCH_SIZE_MAX)
         batch_orders, self.pending_orders = self.select_similar_batch(batch_size)
         amrId = None
-        if (amr):
+        if amr:
             amrId = amr.id
 
-        batch = models.Batch(orders=batch_orders, picker_id = picker.id, amr_id = amrId)
+        batch = models.Batch(orders=batch_orders, picker_id=picker.id, amr_id=amrId)
         return batch
 
     # Greedy order assignment, picking whichever picker becomes available earliest
     def select_picker(self):
         return min(self.pickers, key=lambda p: p.available_time)
-    
+
     def select_amr(self):
         if len(self.amrs) == 0:
             return
-        return min(self.amrs, key=lambda p: p.available_time) 
+        return min(self.amrs, key=lambda p: p.available_time)
 
     # Build a nearest-neighbor route for the batch from staging through all item locations and back
     def build_route(self, orders):
@@ -51,7 +58,8 @@ class FollowSim(models.Simulation):
         final = isinstance(payload, dict) and payload.get("final", False)
         # A timeout event forces a dispatch if the oldest pending order has waited BATCH_TIMEOUT
         timeout = (
-            isinstance(payload, dict) and payload.get("timeout", False)
+            isinstance(payload, dict)
+            and payload.get("timeout", False)
             and self.pending_orders
             and self.time - self.pending_orders[0].arrival_time >= params.BATCH_TIMEOUT
         )
@@ -66,20 +74,22 @@ class FollowSim(models.Simulation):
         picker = self.select_picker()
         amr = self.select_amr()
 
-        # Schedules batch dispatch in the future if picker and/or AMR not available and returns 
-        if picker.available_time > self.time or (amr != None and amr.available_time > self.time):
+        # Schedules batch dispatch in the future if picker and/or AMR not available and returns
+        if picker.available_time > self.time or (
+            amr != None and amr.available_time > self.time
+        ):
             time = 0
-            if (amr):
+            if amr:
                 time = amr.available_time
             self.schedule(max(picker.available_time, time), "BATCH_DISPATCH", payload)
             return
 
         batch = self.create_batch(picker, amr, force=force)
-        if batch is None: # Invalid batch-catching
+        if batch is None:  # Invalid batch-catching
             return
 
         picker.mark_busy(self.time)
-        if (amr):
+        if amr:
             amr.mark_busy(self.time)
 
         route = self.build_route(batch.orders)
@@ -87,7 +97,9 @@ class FollowSim(models.Simulation):
         human_travel_time = travel_distance / params.WALKING_SPEED
         amr_travel_time = travel_distance / params.AMR_SPEED
 
-        time_cursor = self.time + max(human_travel_time, amr_travel_time) # Holds time from batch start to end
+        time_cursor = self.time + max(
+            human_travel_time, amr_travel_time
+        )  # Holds time from batch start to end
 
         # Map each location to the orders that have items there
         coord_orders = {}
@@ -110,24 +122,27 @@ class FollowSim(models.Simulation):
             orders_at_node = coord_orders.get(node, [])
             if not orders_at_node:
                 continue
-            if (amr):
+            if amr:
                 pick_duration = len(orders_at_node) * params.AMR_LOAD_TIME
-            else: 
+            else:
                 pick_duration = len(orders_at_node) * params.HUMAN_PICK_TIME
             if pick_duration > 0:
-                time_cursor += pick_duration # Update batch time every pick
+                time_cursor += pick_duration  # Update batch time every pick
 
             seen_orders = {}
-            for order in orders_at_node: # Add all items at node to "seen orders"
+            for order in orders_at_node:  # Add all items at node to "seen orders"
                 seen_orders[id(order)] = order
-            for order in seen_orders.values(): # For each item in "seen orders"
+            for order in seen_orders.values():  # For each item in "seen orders"
                 if order.pick_start_time is None:
                     order.pick_start_time = time_cursor - pick_duration
-                if (order.is_perishable and order.perishable_picked_at is None
-                        and node in order.perishable_coords):
+                if (
+                    order.is_perishable
+                    and order.perishable_picked_at is None
+                    and node in order.perishable_coords
+                ):
                     order.perishable_picked_at = time_cursor - pick_duration
                 decrement = sum(1 for coord in order.coords if coord == node)
-                order.items_remaining -= decrement # Decrement items remaining in batch
+                order.items_remaining -= decrement  # Decrement items remaining in batch
                 if order.items_remaining <= 0 and order.completion_time is None:
                     order.completion_time = time_cursor
 
@@ -140,21 +155,26 @@ class FollowSim(models.Simulation):
         # Update picker avalible time and schedule a pick complete event
         finish_time = time_cursor
         picker.available_time = finish_time
-        if (amr):
+        if amr:
             amr.available_time = finish_time
         self.schedule(finish_time, "PICK_COMPLETE", batch)
 
+
 # Main experimentation space where testing occurs
 if __name__ == "__main__":
-    layout = setup_medium()  # Medium layout has all 16 departments, used as baseline before layout realism changes
+    layout = (
+        setup_medium()
+    )  # Medium layout has all 16 departments, used as baseline before layout realism changes
     coord_map = map_of_coords(layout)
     dist_map = all_distance_maps(layout)  # Precompute distances for routing
     staging = coord_map["S"][0]
 
     # Precompute list of orders
-    raw_orders = generate_orders(coord_map, params.SIM_TIME, layout, params.ORDER_ARRIVAL_RATE)
+    raw_orders = generate_orders(
+        coord_map, params.SIM_TIME, layout, params.ORDER_ARRIVAL_RATE
+    )
     orders = [
-       models.Order(
+        models.Order(
             id=raw_order["order_id"],
             arrival_time=raw_order["arrival_time"],
             items=raw_order["items"],
@@ -170,5 +190,7 @@ if __name__ == "__main__":
     pickers = [models.Picker(i, staging) for i in range(params.num_pickers)]
     amrs = [models.AMR(i, staging) for i in range(params.num_robots)]
 
-    sim = FollowSim(orders, pickers, amrs, coord_map, staging=staging, dist_map=dist_map)
+    sim = FollowSim(
+        orders, pickers, amrs, coord_map, staging=staging, dist_map=dist_map
+    )
     sim.run()

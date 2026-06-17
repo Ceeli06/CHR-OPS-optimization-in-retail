@@ -1,12 +1,19 @@
 ﻿# Discrete-event simulation for a manual (human-only) retail order picking policy.
-# Orders arrive via Poisson process, are batched (6-8 per cart), 
+# Orders arrive via Poisson process, are batched (6-8 per cart),
 # assigned to a picker, and routed using a greedy nearest-neighbor heuristic algorithm
 
 import params
 import models
 from dataclasses import dataclass
 from orderGen import generate_orders
-from setup_layout import setup_medium, map_of_coords, path_distance, all_distance_maps, get_path
+from setup_layout import (
+    setup_medium,
+    map_of_coords,
+    path_distance,
+    all_distance_maps,
+    get_path,
+)
+
 
 # Main DES simulation, where time advances only when events occur (arrivals, dispatches, completions)
 class ManualSim(models.Simulation):
@@ -20,7 +27,7 @@ class ManualSim(models.Simulation):
         batch_size = min(len(self.pending_orders), params.BATCH_SIZE_MAX)
         batch_orders, self.pending_orders = self.select_similar_batch(batch_size)
 
-        return models.Batch(orders=batch_orders, picker_id=picker.id, amr_id = None)
+        return models.Batch(orders=batch_orders, picker_id=picker.id, amr_id=None)
 
     # Greedy orrder assignment, picking whichever picker becomes available earliest
     def select_picker(self):
@@ -47,7 +54,8 @@ class ManualSim(models.Simulation):
         final = isinstance(payload, dict) and payload.get("final", False)
         # A timeout event forces a dispatch if the oldest pending order has waited BATCH_TIMEOUT
         timeout = (
-            isinstance(payload, dict) and payload.get("timeout", False)
+            isinstance(payload, dict)
+            and payload.get("timeout", False)
             and self.pending_orders
             and self.time - self.pending_orders[0].arrival_time >= params.BATCH_TIMEOUT
         )
@@ -65,17 +73,16 @@ class ManualSim(models.Simulation):
             return
 
         batch = self.create_batch(picker, force=force)
-        if batch is None: # Invalid batch-catching
+        if batch is None:  # Invalid batch-catching
             return
 
         picker.mark_busy(self.time)
 
         route = self.build_route(batch.orders)
         travel_distance = path_distance(route, self.dist_map)
-        travel_time = travel_distance / params.WALKING_SPEED 
-        
+        travel_time = travel_distance / params.WALKING_SPEED
 
-        time_cursor = self.time + travel_time # Holds time from batch start to end
+        time_cursor = self.time + travel_time  # Holds time from batch start to end
 
         # Map each location to the orders that have items there
         coord_orders = {}
@@ -101,19 +108,22 @@ class ManualSim(models.Simulation):
 
             pick_duration = len(orders_at_node) * params.HUMAN_PICK_TIME
             if pick_duration > 0:
-                time_cursor += pick_duration # Update batch time every pick
+                time_cursor += pick_duration  # Update batch time every pick
 
             seen_orders = {}
-            for order in orders_at_node: # Add all items at node to "seen orders"
+            for order in orders_at_node:  # Add all items at node to "seen orders"
                 seen_orders[id(order)] = order
-            for order in seen_orders.values(): # For each item in "seen orders"
+            for order in seen_orders.values():  # For each item in "seen orders"
                 if order.pick_start_time is None:
                     order.pick_start_time = time_cursor - pick_duration
-                if (order.is_perishable and order.perishable_picked_at is None
-                        and node in order.perishable_coords):
+                if (
+                    order.is_perishable
+                    and order.perishable_picked_at is None
+                    and node in order.perishable_coords
+                ):
                     order.perishable_picked_at = time_cursor - pick_duration
                 decrement = sum(1 for coord in order.coords if coord == node)
-                order.items_remaining -= decrement # Decrement items remaining in batch
+                order.items_remaining -= decrement  # Decrement items remaining in batch
                 if order.items_remaining <= 0 and order.completion_time is None:
                     order.completion_time = time_cursor
 
@@ -126,15 +136,20 @@ class ManualSim(models.Simulation):
         picker.available_time = finish_time
         self.schedule(finish_time, "PICK_COMPLETE", batch)
 
+
 # Main experimentation space where testing occurs
 if __name__ == "__main__":
-    layout = setup_medium()  # Medium layout has all 16 departments, used as baseline before layout realism changes
+    layout = (
+        setup_medium()
+    )  # Medium layout has all 16 departments, used as baseline before layout realism changes
     coord_map = map_of_coords(layout)
     dist_map = all_distance_maps(layout)  # Precompute distances for routing
     staging = coord_map["S"][0]
 
     # Precompute list of orders
-    raw_orders = generate_orders(coord_map, params.SIM_TIME, layout, params.ORDER_ARRIVAL_RATE)
+    raw_orders = generate_orders(
+        coord_map, params.SIM_TIME, layout, params.ORDER_ARRIVAL_RATE
+    )
     orders = [
         models.Order(
             id=raw_order["order_id"],
@@ -152,5 +167,7 @@ if __name__ == "__main__":
     pickers = [models.Picker(i, staging) for i in range(params.num_pickers)]
     amrs = [models.AMR(i, staging) for i in range(params.num_robots)]
 
-    sim = ManualSim(orders, pickers, amrs, coord_map, staging=staging, dist_map=dist_map)
+    sim = ManualSim(
+        orders, pickers, amrs, coord_map, staging=staging, dist_map=dist_map
+    )
     sim.run()
