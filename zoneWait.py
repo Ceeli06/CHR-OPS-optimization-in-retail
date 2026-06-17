@@ -245,10 +245,11 @@ class ZoneWait(models2.Simulation):
             # walking from last picking point to handoff point
             r, c = self.handoffPoints[zone_id]
             dist_last_to_zone_center = dist_map[prev_node][r,c]
+            human_travel_distance += dist_last_to_zone_center
             picker_time += dist_last_to_zone_center / params.WALKING_SPEED
             picker.available_time = picker_time
             picker_finish_times[zone_id]= picker_time
-            picker.mark_idle(self.time)
+            picker.mark_idle(picker_time)
 
         # Deals w/ AMR wait time & metrics
         amr_wait_time = 0
