@@ -116,7 +116,9 @@ class FollowSim(models.Simulation):
                 coord_orders.setdefault(coord, []).append(order)
 
         # Walk the route, picking items and updating order state at each stop
-        for node in route[1:]:
+        for node in route[
+            1:-1
+        ]:  # ignores picking @ staging which is at the start and end of each route
             if node == self.staging:
                 break
             orders_at_node = coord_orders.get(node, [])

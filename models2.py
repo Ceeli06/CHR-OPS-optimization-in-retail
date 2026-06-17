@@ -68,8 +68,8 @@ class AMR:
 # A set of orders grouped together for one picker to handle (6-8 per cart for manual)
 @dataclass
 class Batch:
-    orders: list[list]
-    picker_id: list[int]
+    orders: list
+    zoned_orders: dict[list]
     amr_id: list[int]
 
 
@@ -92,6 +92,7 @@ class Metrics:
         self.spoiled_perishables = 0
         self.total_perishables = 0
         self.human_wait_for_amr = 0.0
+        self.amr_wait_for_human = 0.0
 
     # Record a completed order's comp.time and check if it missed the due time
     def record_completion(self, order: Order):
@@ -119,7 +120,7 @@ class Metrics:
 
         # AMR utilization (ignored for manual policy since AMR not used)
         amr_util = (
-            ((sim_time - self.amr_idle) / sim_time) * 100 if sim_time > 0 else 0.0
+            ((sim_time - (self.amr_idle/params.num_robots)) / sim_time) * 100 if sim_time > 0 else 0.0
         )
         # NOTE: above breaks down when there are just amrs idle (never utilized), will be negative..is this okay?
 
@@ -141,6 +142,7 @@ class Metrics:
         print(f"Total picker travel distance: {self.human_distance:.2f} meters")
         print(f"Total picker idle time: {self.human_idle/60:.2f} min")
         print(f"Human wait time for AMR: {self.human_wait_for_amr/60:.2f} min")
+        print(f"AMR wait time for human: {self.amr_wait_for_human/60:.2f} min")
         print(f"Total AMR idle time: {self.amr_idle/60:.2f} min")
         print(f"AMR utilization: {amr_util:.2f}%")
         print(f"Avg perishable exposure time: {avg_exposure/60:.2f} min")
@@ -201,7 +203,7 @@ class Simulation:
             if event_type == "ORDER_ARRIVAL":
                 self.handle_order_arrival(payload)
             elif event_type == "BATCH_DISPATCH":
-                self.handle_batch(payload)
+                self.handle_batch(payload, None)
             elif event_type == "PICK_COMPLETE":
                 self.handle_pick_complete(payload)
             elif event_type == "SIM_END_FLUSH":
@@ -307,8 +309,8 @@ class Simulation:
     # Mark picker idle, record metrics for the completed batch, and schedule the next one if ready
     def handle_pick_complete(self, batch):
         # Update picker
-        picker = self.pickers[batch.picker_id]
-        picker.mark_idle(self.time)
+        #picker = self.pickers[batch.picker_id]
+        #picker.mark_idle(self.time)
         if batch.amr_id:
             amr = self.amrs[batch.amr_id]
             amr.mark_idle(self.time)

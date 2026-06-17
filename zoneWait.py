@@ -5,8 +5,8 @@ from setup_layout import (
     setup_medium,
     map_of_coords,
     get_path,
-    path_distance,
     all_distance_maps,
+    path_distance,
 )
 from collections import defaultdict
 import math
@@ -23,8 +23,8 @@ class ZoneWait(models2.Simulation):
 
         self.zoneMap = self.coordinate_zoning(layout, coord_map)
         self.handoffPoints = self.get_zone_handoff_points(self.zoneMap, layout)
-        print(self.handoffPoints)
 
+    # returns a zone map where zone[r][c] gives zone # (also picker_id) of location (r,c)
     def coordinate_zoning(self, layout, coord_map):
         rows = len(layout)
         cols = len(layout[0])
@@ -38,8 +38,8 @@ class ZoneWait(models2.Simulation):
 
         zone = [[None for _ in range(cols)] for _ in range(rows)]
 
-        # freezer zone always assigned to first associate
-        for r, c in freezer_coords:
+        # freezer zone always assigned to last associate
+        for r, c in walkable_freezer_coords:
             zone[r][c] = 0
 
         # splits remaining space by x-coordinate
@@ -48,7 +48,7 @@ class ZoneWait(models2.Simulation):
         for r in range(rows):
             for c in range(cols):
 
-                if (r, c) in freezer_coords:
+                if (r, c) in walkable_freezer_coords:
                     continue
 
                 zone_id = int(c / zone_width)
@@ -77,8 +77,21 @@ class ZoneWait(models2.Simulation):
             coord = convert_to_walkable(coord, layout)
             handoff_points[zone_id] = coord
         return handoff_points
+    
+    # takes in a list of order coordinates (for one batch) and returns a list 
+    # of the orders to which picker/zone they are assigned to (the index)
+    def split_orders_into_zones(self, orders, zone_map):
+        order_zones = defaultdict(list)
 
-    def create_batch(self, picker, amr, force=False):
+        for order in orders:
+            for coord in order.coords:
+                r, c = coord
+                zone_id = zone_map[r][c]
+                order_zones[zone_id].append(coord)
+        return order_zones
+
+
+    def create_batch(self, pickers, amr, force=False):
         if not self.pending_orders:
             return None
         if not force and len(self.pending_orders) < params.BATCH_SIZE_MIN:
@@ -86,11 +99,13 @@ class ZoneWait(models2.Simulation):
 
         batch_size = min(len(self.pending_orders), params.BATCH_SIZE_MAX)
         batch_orders, self.pending_orders = self.select_similar_batch(batch_size)
+       
+        zoned_orders = self.split_orders_into_zones(batch_orders, self.zoneMap)
+    
         amrId = None
         if amr:
             amrId = amr.id
-
-        return models2.Batch(orders=batch_orders, picker_id=picker.id, amr_id=amrId)
+        return models2.Batch(orders=batch_orders, zoned_orders = zoned_orders, amr_id=amrId)
 
     # Greedy order assignment, picking whichever picker becomes available earliest
     def select_picker(self):
@@ -102,127 +117,227 @@ class ZoneWait(models2.Simulation):
         return min(self.amrs, key=lambda p: p.available_time)
 
     # Build a nearest-neighbor route for the batch from staging through all item locations and back
-    def build_route(self, orders):
-        coords = []
-        for order in orders:
-            coords.extend(order.coords)
-
-        unique_coords = list(dict.fromkeys(coords))
+    def build_route(self, orders, startEnd):
+    
+        unique_coords = list(dict.fromkeys(orders))
         if not unique_coords:
-            return [self.staging]
+            return [startEnd]
 
-        route = get_path(unique_coords, self.dist_map, self.staging, self.map)
-        if not route or route[-1] != self.staging:
-            route.append(self.staging)
+        route = get_path(unique_coords, self.dist_map, startEnd, self.map)
+        if not route or route[-1] != startEnd:
+            route.append(startEnd)
 
         return route
 
+
+    def build_zoning_route(self, zoned_orders):
+        route = {}
+
+        for zone_id, coords in zoned_orders.items():
+            route[zone_id] = self.build_route(coords, self.handoffPoints[zone_id])
+
+        return route
+    
     # Main order handling function which routes a batch, computes pick times, and schedules its completion
-    def handle_batch(self, payload):
+    def handle_batch(self, payload, zoneFollow):
         final = isinstance(payload, dict) and payload.get("final", False)
-        # A timeout event forces a dispatch if the oldest pending order has waited BATCH_TIMEOUT
+
         timeout = (
             isinstance(payload, dict)
             and payload.get("timeout", False)
             and self.pending_orders
             and self.time - self.pending_orders[0].arrival_time >= params.BATCH_TIMEOUT
         )
+
         force = final or timeout
 
-        # Abort if batch is not valid
         if not force and len(self.pending_orders) < params.BATCH_SIZE_MIN:
             return
 
-        # Check picker availability before pulling orders from pending_orders,
-        # so a busy picker doesn't cause orders to be lost on reschedule
-        picker = self.select_picker()
         amr = self.select_amr()
 
-        # Schedules batch dispatch in the future if picker and/or AMR not available and returns
-        if picker.available_time > self.time or (
-            amr != None and amr.available_time > self.time
-        ):
-            time = 0
-            if amr:
-                time = amr.available_time
-            self.schedule(max(picker.available_time, time), "BATCH_DISPATCH", payload)
+        # amr availability check
+        if amr and amr.available_time > self.time:
+            self.schedule(amr.available_time, "BATCH_DISPATCH", payload)
+            return
+        #first picker check
+        if self.pickers[0].available_time > self.time:
+            self.schedule(self.pickers[0].available_time, "BATCH_DISPATCH", payload)
             return
 
-        batch = self.create_batch(picker, amr, force=force)
-        if batch is None:  # Invalid batch-catching
+        batch = self.create_batch(self.pickers, amr, force=force)
+        if batch is None:
             return
 
-        picker.mark_busy(self.time)
         if amr:
             amr.mark_busy(self.time)
 
-        route = self.build_route(batch.orders)
-        travel_distance = path_distance(route, self.dist_map)
-        human_travel_time = travel_distance / params.WALKING_SPEED
-        amr_travel_time = travel_distance / params.AMR_SPEED
+        #for p in self.pickers:
+        #    p.mark_busy(self.time)
 
-        time_cursor = self.time + max(
-            human_travel_time, amr_travel_time
-        )  # Holds time from batch start to end
+        route = self.build_zoning_route(batch.zoned_orders) #doesn't include start: staging and end: staging
+       
+        human_travel_distance = sum(path_distance(zonePath, self.dist_map) for zonePath in route.values()) 
 
-        # Map each location to the orders that have items there
+        # sets up coordinate to order # (used later in metrics determination)
         coord_orders = {}
         for order in batch.orders:
             order.pick_start_time = None
             order.items_remaining = len(order.coords)
+
             order.is_perishable = any(
-                str(item.get("department", "")).lower().find("perishable") >= 0
+                "perishable" in str(item.get("department", "")).lower()
                 for item in order.items
             )
+
             order.perishable_coords = self.perishable_coords_for_order(order)
             order.perishable_picked_at = None
+
             for coord in order.coords:
                 coord_orders.setdefault(coord, []).append(order)
 
-        # Walk the route, picking items and updating order state at each stop
-        for node in route[1:]:
-            if node == self.staging:
-                break
-            orders_at_node = coord_orders.get(node, [])
-            if not orders_at_node:
-                continue
-            if amr:
-                pick_duration = len(orders_at_node) * params.AMR_LOAD_TIME
-            else:
-                pick_duration = len(orders_at_node) * params.HUMAN_PICK_TIME
-            if pick_duration > 0:
-                time_cursor += pick_duration  # Update batch time every pick
+        
+        picker_finish_times = {}
 
-            seen_orders = {}
-            for order in orders_at_node:  # Add all items at node to "seen orders"
-                seen_orders[id(order)] = order
-            for order in seen_orders.values():  # For each item in "seen orders"
-                if order.pick_start_time is None:
-                    order.pick_start_time = time_cursor - pick_duration
-                if (
-                    order.is_perishable
-                    and order.perishable_picked_at is None
-                    and node in order.perishable_coords
-                ):
-                    order.perishable_picked_at = time_cursor - pick_duration
-                decrement = sum(1 for coord in order.coords if coord == node)
-                order.items_remaining -= decrement  # Decrement items remaining in batch
-                if order.items_remaining <= 0 and order.completion_time is None:
-                    order.completion_time = time_cursor
+        for zone_id, zonePath in route.items():
 
-        # Update walking distance of picker and global total
-        picker.distance_walked += travel_distance
-        self.metrics.human_distance += travel_distance
-        self.metrics.human_wait_for_amr = max(0, amr_travel_time - human_travel_time)
-        self.metrics.human_idle += max(0, amr_travel_time - human_travel_time)
+            picker = self.pickers[zone_id]
 
-        # Update picker avalible time and schedule a pick complete event
-        finish_time = time_cursor
-        picker.available_time = finish_time
-        if amr:
-            amr.available_time = finish_time
+            start_time = max(self.time, picker.available_time)
+            picker_time = start_time
+
+            picker.mark_busy(start_time)
+            prev_node = zonePath[0]
+
+            for node in zonePath[1:-1]:
+                if node == self.staging:
+                    break
+                walk_dist = self.dist_map[prev_node][node[0], node[1]]
+                walk_time = walk_dist / (params.WALKING_SPEED)
+                picker_time += walk_time
+                
+                
+                orders_at_node = coord_orders.get(node, [])
+                if not orders_at_node:
+                    continue
+
+                if zoneFollow:
+                    pick_duration = len(orders_at_node) * params.AMR_LOAD_TIME
+                else:
+                    pick_duration = len(orders_at_node) * (params.HUMAN_PICK_TIME + params.AMR_LOAD_TIME) # accounts for moving items to AMR @ end
+
+                picker_time += pick_duration
+
+                unique_orders = {id(o): o for o in orders_at_node}
+
+                for order in unique_orders.values():
+                    if order.pick_start_time is None:
+                        order.pick_start_time = picker_time - pick_duration
+
+                    if (
+                        order.is_perishable
+                        and order.perishable_picked_at is None
+                        and node in order.perishable_coords
+                    ):
+                        order.perishable_picked_at = picker_time - pick_duration
+
+                    decrement = sum(1 for c in order.coords if c == node)
+                    order.items_remaining -= decrement
+
+                prev_node = node
+            # walking from last picking point to handoff point
+            r, c = self.handoffPoints[zone_id]
+            dist_last_to_zone_center = dist_map[prev_node][r,c]
+            picker_time += dist_last_to_zone_center / params.WALKING_SPEED
+            picker.available_time = picker_time
+            picker_finish_times[zone_id]= picker_time
+            picker.mark_idle(self.time)
+
+        # Deals w/ AMR wait time & metrics
+        amr_wait_time = 0
+        human_wait_time = 0
+
+        if amr and route and not zoneFollow:
+            #amr visits the furthest zone first then comes back to the zone containing perishables last
+            zone_ids = sorted(route.keys())
+            amr_time = self.time
+
+            # staging -> first zone
+            first_zone = zone_ids[0]
+
+            travel_dist = path_distance(
+                [self.staging, self.handoffPoints[first_zone]],
+                self.dist_map
+            )
+
+            amr_time += travel_dist / params.AMR_SPEED
+
+            # visit zones sequentially
+            for idx, zone_id in enumerate(zone_ids):
+
+                picker_finish = picker_finish_times[zone_id]
+
+                if amr_time < picker_finish:
+                    # AMR arrived before picker finished
+                    wait = picker_finish - amr_time
+                    amr_wait_time += wait
+                    amr_time += wait
+
+                else:
+                    # Picker finished before AMR arrived
+                    human_wait_time += amr_time - picker_finish
+
+                # Handoff/loading time
+                amr_time += params.AMR_LOAD_TIME
+
+                # Travel to next zone
+                if idx < len(zone_ids) - 1:
+
+                    next_zone = zone_ids[idx + 1]
+
+                    travel_dist = path_distance(
+                        [
+                            self.handoffPoints[zone_id],
+                            self.handoffPoints[next_zone]
+                        ],
+                        self.dist_map
+                    )
+
+                    amr_time += travel_dist / params.AMR_SPEED
+
+            # Last zone -> staging
+            last_zone = zone_ids[-1]
+
+            travel_dist = path_distance(
+                [self.handoffPoints[last_zone], self.staging],
+                self.dist_map
+            )
+
+            amr_time += travel_dist / params.AMR_SPEED
+
+            amr_finish_time = amr_time
+            amr.available_time = amr_finish_time
+
+        else:
+            # zone-follow mode or no AMR
+            amr_finish_time = max(
+                picker_finish_times.values(),
+                default=self.time
+            )
+
+        self.metrics.amr_wait_for_human += amr_wait_time
+        self.metrics.human_distance += human_travel_distance
+        self.metrics.human_wait_for_amr += human_wait_time
+        self.metrics.human_idle += self.metrics.human_wait_for_amr
+        finish_time = max(
+            max(picker_finish_times.values(), default=self.time),
+            amr_finish_time
+        )
+        for order in batch.orders:
+            if order.items_remaining <= 0 and order.completion_time is None:
+                order.completion_time = finish_time
+
         self.schedule(finish_time, "PICK_COMPLETE", batch)
-
 
 # Main experimentation space where testing occurs
 if __name__ == "__main__":
