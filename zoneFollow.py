@@ -200,7 +200,7 @@ class ZoneFollow(models2.Simulation):
 
         
         picker_finish_times = {}
-        prev_amr_coord = staging
+        prev_amr_coord = self.staging
         amr_wait_for_human = 0
         human_wait_for_amr = 0
 
@@ -264,9 +264,10 @@ class ZoneFollow(models2.Simulation):
             picker_time += dist_last_to_zone_center / min(params.WALKING_SPEED, params.AMR_SPEED)
             picker.available_time = picker_time
             picker_finish_times[zone_id]= picker_time
+            amr.available_time = picker_time
             picker.mark_idle(self.time)
 
-        amr_finish_time = max(picker_finish_times.values())
+        amr_finish_time = amr.available_time
         # Last zone -> staging
         travel_dist = path_distance(
                 [prev_amr_coord, self.staging],
