@@ -1,10 +1,11 @@
 # Discrete-event simulation for a manual (human-only) retail order picking policy.
-# Orders arrive via Poisson process, are batched (6-8 per cart), 
+# Orders arrive via Poisson process, are batched (6-8 per cart),
 # assigned to a picker, and routed using a greedy nearest-neighbor heuristic algorithm
 
 import params
 import heapq
 from dataclasses import dataclass
+
 
 # A customer order with items to be picked from the store
 @dataclass
@@ -80,7 +81,9 @@ class Batch:
 # Utilities to collect and print key performance metrics at end of simulation
 class Metrics:
     def __init__(self):
-        self.completion_times = []  # List of order completion times (comp.Time = comp.time - arrivalTime)
+        self.completion_times = (
+            []
+        )  # List of order completion times (comp.Time = comp.time - arrivalTime)
         self.late_orders = 0
         self.total_orders = 0
 
@@ -97,7 +100,9 @@ class Metrics:
 
     # Record a completed order's comp.time and check if it missed the due time
     def record_completion(self, order: Order):
-        final_completion_time = (order.completion_time - order.arrival_time) + params.STAGING_TIME
+        final_completion_time = (
+            order.completion_time - order.arrival_time
+        ) + params.STAGING_TIME
         self.completion_times.append(final_completion_time)
 
         if final_completion_time > params.ORDER_DUE_TIME:
@@ -107,23 +112,34 @@ class Metrics:
 
     # Compute and print all final metrics
     def finalize(self, sim_time: float):
-        avg_completion = sum(self.completion_times) / len(self.completion_times) if self.completion_times else 0.0
-        late_pct = (self.late_orders / self.total_orders) * 100 if self.total_orders else 0.0
+        avg_completion = (
+            sum(self.completion_times) / len(self.completion_times)
+            if self.completion_times
+            else 0.0
+        )
+        late_pct = (
+            (self.late_orders / self.total_orders) * 100 if self.total_orders else 0.0
+        )
         throughput = self.total_orders / (sim_time / 3600) if sim_time > 0 else 0.0
 
         # AMR utilization (ignored for manual policy since AMR not used)
-        amr_util = ((sim_time - ((self.amr_idle)/params.num_robots)) / sim_time) * 100 if sim_time > 0 else 0.0
+        amr_util = (
+            ((sim_time - ((self.amr_idle) / params.num_robots)) / sim_time) * 100
+            if sim_time > 0
+            else 0.0
+        )
         # NOTE: above breaks down when there are just amrs idle (never utilized), will be negative..is this okay?
-        
 
         avg_exposure = (
             sum(self.perishable_exposure) / len(self.perishable_exposure)
-            if self.perishable_exposure else 0.0
+            if self.perishable_exposure
+            else 0.0
         )
 
         spoiled_pct = (
             (self.spoiled_perishables / self.total_perishables) * 100
-            if self.total_perishables else 0.0
+            if self.total_perishables
+            else 0.0
         )
 
         print("\n===== METRICS =====")
@@ -144,7 +160,9 @@ class Metrics:
 class Simulation:
     def __init__(self, orders, pickers, amrs, coord_map, staging=(0, 0), dist_map=None):
         self.time = 0.0
-        self.event_queue = []  # Event queue containing: (time, counter, event_type, payload)
+        self.event_queue = (
+            []
+        )  # Event queue containing: (time, counter, event_type, payload)
         self.event_counter = 0  # Used so events with same arrival_time process FIFO
 
         self.orders = sorted(orders, key=lambda o: o.arrival_time)
@@ -158,7 +176,7 @@ class Simulation:
         self.metrics = Metrics()
         self.map = coord_map
 
-        #Sets up event queue for scheduling order events
+        # Sets up event queue for scheduling order events
         for order in self.orders:
             self.schedule(order.arrival_time, "ORDER_ARRIVAL", order)
 
@@ -166,7 +184,9 @@ class Simulation:
 
     # Push an event onto the priority queue using heapq
     def schedule(self, time: float, event_type: str, payload):
-        heapq.heappush(self.event_queue, (time, self.event_counter, event_type, payload))
+        heapq.heappush(
+            self.event_queue, (time, self.event_counter, event_type, payload)
+        )
         self.event_counter += 1
 
     # Main simulation loop which processes events in chronological order until time exceeds SIM_TIME
@@ -203,7 +223,9 @@ class Simulation:
         if len(self.pending_orders) >= params.BATCH_SIZE_MIN:
             self.schedule(self.time, "BATCH_DISPATCH", None)
         elif len(self.pending_orders) == 1:
-            self.schedule(self.time + params.BATCH_TIMEOUT, "BATCH_DISPATCH", {"timeout": True})
+            self.schedule(
+                self.time + params.BATCH_TIMEOUT, "BATCH_DISPATCH", {"timeout": True}
+            )
 
     # At sim end, push any remaining pending orders into a final batch
     def handle_end_flush(self):
@@ -212,11 +234,8 @@ class Simulation:
 
     # Helper that returns a set of all department names in an order
     def department_set(self, order):
-        return {
-            str(item.get("department", "")).lower()
-            for item in order.items
-        }
-    
+        return {str(item.get("department", "")).lower() for item in order.items}
+
     # Gets Jaccard similarity of two order's department sets (0 = completely different, 1 = identical)
     def order_similarity(self, a, b):
         depts_a = self.department_set(a)
@@ -246,8 +265,7 @@ class Simulation:
 
         # Greedily fill remaining slots via. Jaccard with orders most similar to the first order (seed)
         remaining_indices = [
-            i for i in range(1, len(self.pending_orders))
-            if i not in selected_indices
+            i for i in range(1, len(self.pending_orders)) if i not in selected_indices
         ]
         remaining_indices.sort(
             key=lambda i: (-self.order_similarity(seed, self.pending_orders[i]), i)
@@ -260,7 +278,8 @@ class Simulation:
 
         selected_orders = [self.pending_orders[i] for i in sorted(selected_indices)]
         remaining_orders = [
-            order for i, order in enumerate(self.pending_orders)
+            order
+            for i, order in enumerate(self.pending_orders)
             if i not in selected_indices
         ]
         return selected_orders, remaining_orders
@@ -280,7 +299,9 @@ class Simulation:
         perishable_coords = set()
         for item in order.items:
             quantity = item.get("quantity", 1)
-            is_perishable_item = str(item.get("department", "")).lower().find("perishable") >= 0
+            is_perishable_item = (
+                str(item.get("department", "")).lower().find("perishable") >= 0
+            )
             for _ in range(quantity):
                 coord = next(coords_iter)
                 if is_perishable_item:
@@ -292,7 +313,7 @@ class Simulation:
         # Update picker
         picker = self.pickers[batch.picker_id]
         picker.mark_idle(self.time)
-        if (batch.amr_id):
+        if batch.amr_id:
             amr = self.amrs[batch.amr_id]
             amr.mark_idle(self.time)
 

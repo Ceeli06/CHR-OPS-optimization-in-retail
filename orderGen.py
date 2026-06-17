@@ -19,15 +19,14 @@ with open(orders_path, "r") as f:
     orders = json.load(f)  # Dict mapping order IDs to items
     order_keys = list(orders.keys())  # List of all order IDs
 
-# Picks a random order and returns it as a dict with order id 
+
+# Picks a random order and returns it as a dict with order id
 #                           and items in order as a list of {dept, qty}
-def generate_order_helper(): 
+def generate_order_helper():
     visit_id = random.choice(order_keys)
-    order = copy.deepcopy(orders[visit_id]) # Use deepcopy to not modify orginal
-    return {
-        "visit_id": visit_id,
-        "items": order
-    }
+    order = copy.deepcopy(orders[visit_id])  # Use deepcopy to not modify orginal
+    return {"visit_id": visit_id, "items": order}
+
 
 # Gets and returns a list of coordinates for each item in an order
 def generate_order_coords(items, coord_map, layout):
@@ -47,10 +46,13 @@ def generate_order_coords(items, coord_map, layout):
         # For each item, pick a random location in that department
         for _ in range(quantity):
             coord = random.choice(possible_coords)
-            coord = convert_to_walkable(coord, layout) # converts the unwalkable aisle location to an actual walkable location for the picker to go to
+            coord = convert_to_walkable(
+                coord, layout
+            )  # converts the unwalkable aisle location to an actual walkable location for the picker to go to
             coords.append(coord)
 
     return coords
+
 
 def convert_to_walkable(coord, layout):
     r, c = coord
@@ -62,36 +64,36 @@ def convert_to_walkable(coord, layout):
 
     directions = [
         (-1, 0),  # up
-        (1, 0),   # down
+        (1, 0),  # down
         (0, -1),  # left
-        (0, 1),   # right
+        (0, 1),  # right
     ]
 
     for dr, dc in directions:
         nr, nc = r + dr, c + dc
 
-        if (
-            0 <= nr < rows and
-            0 <= nc < cols and
-            layout[nr, nc] == "."
-        ):
+        if 0 <= nr < rows and 0 <= nc < cols and layout[nr, nc] == ".":
             return (nr, nc)
-        
+
+
 # Generate random order arrival times using a Poisson process (with exponential inter arrival times)
 def generate_order_arrival_times(sim_time, arrival_rate):
     times = []
-    current_time = 0.0 # Gen. at start of sim
+    current_time = 0.0  # Gen. at start of sim
 
     while True:
-        interarrival = random.expovariate(arrival_rate) # Gen. random interarrival time
-        current_time += interarrival # Arrival time = current time + generated int.arr. time
+        interarrival = random.expovariate(arrival_rate)  # Gen. random interarrival time
+        current_time += (
+            interarrival  # Arrival time = current time + generated int.arr. time
+        )
 
-        if current_time >= sim_time: # If end of sim reached, break
+        if current_time >= sim_time:  # If end of sim reached, break
             break
 
-        times.append(current_time) # Append Arrival time to list
+        times.append(current_time)  # Append Arrival time to list
 
-    return times # Return all arrival times of entire sim
+    return times  # Return all arrival times of entire sim
+
 
 # Generates a complete order with items, store coordinates, and arrival time
 def generate_order(coord_map, layout, arrival_time=None):
@@ -104,6 +106,7 @@ def generate_order(coord_map, layout, arrival_time=None):
         "coords": coords,
         "arrival_time": arrival_time,
     }
+
 
 # Generate all orders for the entire simulation, sorted by arrival time as a list
 def generate_orders(coord_map, sim_time, layout, arrival_rate):

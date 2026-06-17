@@ -75,7 +75,9 @@ input_path = "OrderDataset(Original).csv"
 output_path = "OrderDataset(Mapped).csv"
 
 df = pd.read_csv(input_path)
-df["MappedDepartment"] = df["DepartmentDescription"].map(itemType_map).fillna("Miscellaneous")
+df["MappedDepartment"] = (
+    df["DepartmentDescription"].map(itemType_map).fillna("Miscellaneous")
+)
 df.to_csv(output_path, index=False)
 
 print(f"done, saved to {output_path}")

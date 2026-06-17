@@ -1,4 +1,4 @@
-#Provides store layout setup, grid-to-coordinate mapping, and routing.
+# Provides store layout setup, grid-to-coordinate mapping, and routing.
 
 import numpy as np
 from collections import defaultdict, deque
@@ -20,13 +20,15 @@ CATEGORYMAPPING = {
     "Auto": "D",
     "Sports & Outdoors": "E",
     "Arts & Crafts": "F",
-    "Staging": "S"
+    "Staging": "S",
 }
+
 
 # Convert text-based store layout into a 2D numpy array (each char = one grid cell)
 def layout_to_array(layout_text):
     rows = [list(row) for row in layout_text.strip().splitlines()]
     return np.array(rows, dtype=str)
+
 
 # Build a dict mapping each grid symbol to a list of its (row, col) coordinates
 def map_of_coords(layout):
@@ -36,10 +38,11 @@ def map_of_coords(layout):
     for r in range(rows):
         for c in range(cols):
             value = str(layout[r, c])
-            if value != '.':  # Skip walking space
+            if value != ".":  # Skip walking space
                 coord_map[value].append((r, c))
 
     return dict(coord_map)
+
 
 # Load the large store layout from file
 def setup_large():
@@ -47,11 +50,13 @@ def setup_large():
         large_layout = f.read()
         return layout_to_array(large_layout)
 
+
 # Load the medium store layout from file (has all 16 departments)
 def setup_medium():
     with open("Layouts/medium.txt", "r") as f:
         medium_layout = f.read()
         return layout_to_array(medium_layout)
+
 
 # Load the small store layout from file
 def setup_small():
@@ -69,7 +74,7 @@ def distance_map(grid, start):
     q = deque([start])
     dist[start] = 0
 
-    directions = [(1,0), (-1,0), (0,1), (0,-1)]
+    directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
 
     while q:
         r, c = q.popleft()
@@ -78,10 +83,10 @@ def distance_map(grid, start):
             nr, nc = r + dr, c + dc
 
             if (
-                0 <= nr < rows and
-                0 <= nc < cols and
-                (grid[nr, nc] == "." or grid[nr,nc] == "S") and 
-                dist[nr, nc] == -1
+                0 <= nr < rows
+                and 0 <= nc < cols
+                and (grid[nr, nc] == "." or grid[nr, nc] == "S")
+                and dist[nr, nc] == -1
             ):
                 dist[nr, nc] = dist[r, c] + 1
                 q.append((nr, nc))
@@ -120,13 +125,13 @@ def nearest_neighbor(orders, dist_map, staging):
 
         if best_node is None:
             break
-            
 
         path.append(best_node)
         unvisited.remove(best_node)
         current = best_node
 
     return path
+
 
 # Sum the precomputed distances between consecutive waypoints in a route
 def path_distance(path, dist_map):
@@ -141,12 +146,29 @@ def path_distance(path, dist_map):
 
     return total
 
+
+def zone_path_dist(zonePath, dist_map):
+    total = 0
+    for i in range(len(zonePath)):
+        total += path_distance(zonePath[i], dist_map)
+    return total
+
+
+#def zone_amr_dist(zonePath, dist_map, staging):
+#    path = [staging]
+#    for i in zonePath.keys():
+#        coord = zonePath[i][0]
+#        path.append(coord)
+#    path.append(staging)
+#    return path_distance(path, dist_map)
+
+
 def get_path(orders, dist_map, staging, map):
     perishables = []
     non_perishables = []
 
     for order in orders:
-        if order in map['2']:
+        if order in map["2"]:
             perishables.append(order)
         else:
             non_perishables.append(order)

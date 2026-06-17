@@ -9,15 +9,11 @@ df = df[df["ScanCount"] > 0]
 orders = {}
 
 for visit_id, group in df.groupby("VisitNumber"):
-    
+
     dept_totals = group.groupby("MappedDepartment")["ScanCount"].sum()
 
     orders[str(visit_id)] = [
-        {
-            "department": dept,
-            "quantity": int(qty)
-        }
-        for dept, qty in dept_totals.items()
+        {"department": dept, "quantity": int(qty)} for dept, qty in dept_totals.items()
     ]
 
 with open("orders.json", "w") as f:
