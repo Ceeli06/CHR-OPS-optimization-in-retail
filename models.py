@@ -7,7 +7,6 @@ from dataclasses import dataclass
 class Order:
     id: int
     arrival_time: float
-    due_time: float
     items: list  # List of dicts with "department" and "quantity" keys
     coords: list  # (row, col) locations of each item in the store
     is_perishable: bool = False
@@ -15,6 +14,7 @@ class Order:
     pick_start_time: float = None  # When picker first touches this order's items
     completion_time: float = None  # When all items are picked
 
+    due_time: float = 0.0
     perishable_coords: set = None  # Coords belonging to this order's perishable items
     perishable_picked_at: float = None  # When a perishable item was picked
 
