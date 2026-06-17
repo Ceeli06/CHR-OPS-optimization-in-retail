@@ -261,11 +261,12 @@ class ZoneFollow(models2.Simulation):
             r, c = self.handoffPoints[zone_id]
             prev_amr_coord = (r, c)
             dist_last_to_zone_center = dist_map[prev_node][r,c]
+            human_travel_distance+= dist_last_to_zone_center
             picker_time += dist_last_to_zone_center / min(params.WALKING_SPEED, params.AMR_SPEED)
             picker.available_time = picker_time
             picker_finish_times[zone_id]= picker_time
             amr.available_time = picker_time
-            picker.mark_idle(self.time)
+            picker.mark_idle(picker_time)
 
         amr_finish_time = amr.available_time
         # Last zone -> staging
