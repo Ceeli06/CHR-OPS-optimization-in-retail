@@ -18,6 +18,7 @@ class Order:
     pick_start_time: float = None  # When picker first touches this order's items
     completion_time: float = None  # When all items are picked
 
+    due_time: float = 0.0
     perishable_coords: set = None  # Coords belonging to this order's perishable items
     perishable_picked_at: float = None  # When a perishable item was picked
 
