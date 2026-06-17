@@ -161,6 +161,8 @@ class ZoneFollow(models2.Simulation):
             self.schedule(amr.available_time, "BATCH_DISPATCH", payload)
             return
         #first picker check, maybe check last picker instead? ** NOTE ***
+
+        
         if self.pickers[0].available_time > self.time:
             self.schedule(self.pickers[0].available_time, "BATCH_DISPATCH", payload)
             return
@@ -202,7 +204,8 @@ class ZoneFollow(models2.Simulation):
         amr_wait_for_human = 0
         human_wait_for_amr = 0
 
-        for zone_id, zonePath in route.items():
+        for zone_id in sorted(route.keys(), reverse=True):
+            zonePath = route[zone_id]
 
             picker = self.pickers[zone_id]
             r, c = zonePath[0]

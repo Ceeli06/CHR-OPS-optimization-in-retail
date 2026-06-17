@@ -160,10 +160,7 @@ class ZoneWait(models2.Simulation):
         if amr and amr.available_time > self.time:
             self.schedule(amr.available_time, "BATCH_DISPATCH", payload)
             return
-        #first picker check, maybe check last picker instead? ** NOTE ***
-        if self.pickers[0].available_time > self.time:
-            self.schedule(self.pickers[0].available_time, "BATCH_DISPATCH", payload)
-            return
+        
 
         batch = self.create_batch(self.pickers, amr, force=force)
         if batch is None:
@@ -198,8 +195,9 @@ class ZoneWait(models2.Simulation):
 
         
         picker_finish_times = {}
-
-        for zone_id, zonePath in route.items():
+        
+        for zone_id in sorted(route.keys(), reverse=True):
+            zonePath = route[zone_id]
 
             picker = self.pickers[zone_id]
             start_time = max(self.time, max(picker.available_time, amr.available_time))
