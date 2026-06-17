@@ -200,10 +200,10 @@ class ZoneWait(models2.Simulation):
             zonePath = route[zone_id]
 
             picker = self.pickers[zone_id]
-            start_time = max(self.time, max(picker.available_time, amr.available_time))
+            start_time = max(self.time, picker.available_time)
             picker_time = start_time
 
-            picker.mark_busy(start_time)
+            picker.mark_busy(picker_time)
             prev_node = zonePath[0]
 
             for node in zonePath[1:-1]:
@@ -326,7 +326,7 @@ class ZoneWait(models2.Simulation):
         self.metrics.amr_wait_for_human += amr_wait_time
         self.metrics.human_distance += human_travel_distance
         self.metrics.human_wait_for_amr += human_wait_time
-        self.metrics.human_idle += self.metrics.human_wait_for_amr
+        self.metrics.human_idle += human_wait_time
         finish_time = max(
             max(picker_finish_times.values(), default=self.time),
             amr_finish_time

@@ -282,7 +282,7 @@ class ZoneFollow(models2.Simulation):
         self.metrics.amr_wait_for_human += amr_wait_for_human
         self.metrics.human_distance += human_travel_distance
         self.metrics.human_wait_for_amr += human_wait_for_amr
-        self.metrics.human_idle += self.metrics.human_wait_for_amr
+        self.metrics.human_idle += human_wait_for_amr
         
         for order in batch.orders:
             if order.items_remaining <= 0 and order.completion_time is None:

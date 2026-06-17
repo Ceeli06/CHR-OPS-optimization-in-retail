@@ -312,9 +312,9 @@ class Simulation:
     # Mark picker idle, record metrics for the completed batch, and schedule the next one if ready
     def handle_pick_complete(self, batch):
         # Update picker
-        # picker = self.pickers[batch.picker_id]
-        # picker.mark_idle(self.time)
-        if batch.amr_id:
+        #picker = self.pickers[batch.picker_id]
+        #picker.mark_idle(self.time)
+        if batch.amr_id is not None:
             amr = self.amrs[batch.amr_id]
             amr.mark_idle(self.time)
 
