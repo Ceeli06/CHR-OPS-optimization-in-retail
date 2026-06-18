@@ -22,7 +22,7 @@ class ZoneDivided(models2.Simulation):
         self, orders, pickers, amrs, coord_map, layout, staging=(0, 0), dist_map=None
     ):
         super().__init__(
-            orders, pickers, amrs, coord_map, layout, staging=staging, dist_map=dist_map
+            orders, pickers, amrs, coord_map, layout, zoneFollow=False, staging=staging, dist_map=dist_map
         )
 
         self.zoneMap = self.coordinate_zoning(layout, coord_map)
@@ -277,6 +277,8 @@ class ZoneDivided(models2.Simulation):
                 if arrival < picker_finish:
                     # AMR arrived before this zone's picker finished
                     amr_wait_time += picker_finish - arrival
+                    zone_amr.mark_idle(arrival)
+                    zone_amr.mark_busy(picker_finish)
                 else:
                     # Picker finished before the AMR arrived
                     human_wait_time += arrival - picker_finish

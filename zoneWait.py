@@ -277,9 +277,12 @@ class ZoneWait(models2.Simulation):
 
                 if amr_time < picker_finish:
                     # AMR arrived before picker finished
-                    wait = picker_finish - amr_time
+                    arrival_time = amr_time
+                    wait = picker_finish - arrival_time
                     amr_wait_time += wait
                     amr_time += wait
+                    amr.mark_idle(arrival_time)
+                    amr.mark_busy(amr_time)
 
                 else:
                     # Picker finished before AMR arrived

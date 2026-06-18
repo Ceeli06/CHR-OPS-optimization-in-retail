@@ -94,6 +94,7 @@ class Metrics:
         self.spoiled_perishables = 0
         self.total_perishables = 0
         self.human_wait_for_amr = 0.0
+        self.amr_wait_for_human = 0.0
 
     # Record a completed order's comp.time and check if it missed the due time
     def record_completion(self, order: Order):
@@ -108,7 +109,8 @@ class Metrics:
         self.total_orders += 1
 
     # Compute and print all final metrics
-    def finalize(self, sim_time: float):
+    def finalize(self, sim_time: float, elapsed_time: float = None):
+        elapsed_time = elapsed_time if elapsed_time is not None else sim_time
         avg_completion = (
             sum(self.completion_times) / len(self.completion_times)
             if self.completion_times
@@ -121,11 +123,10 @@ class Metrics:
 
         # AMR utilization (ignored for manual policy since AMR not used)
         amr_util = (
-            ((sim_time - ((self.amr_idle) / params.num_robots)) / sim_time) * 100
-            if sim_time > 0
+            ((elapsed_time - ((self.amr_idle) / params.num_robots)) / elapsed_time) * 100
+            if elapsed_time > 0
             else 0.0
         )
-        # NOTE: above breaks down when there are just amrs idle (never utilized), will be negative..is this okay?
 
         avg_exposure = (
             sum(self.perishable_exposure) / len(self.perishable_exposure)
@@ -139,13 +140,23 @@ class Metrics:
             else 0.0
         )
 
+        avg_picker_distance = self.human_distance / params.num_pickers if params.num_pickers else 0.0
+        avg_picker_idle = self.human_idle / params.num_pickers if params.num_pickers else 0.0
+        avg_amr_wait_for_human = self.amr_wait_for_human / params.num_robots if params.num_robots else 0.0
+        avg_amr_idle = self.amr_idle / params.num_robots if params.num_robots else 0.0
+
         print("\n===== METRICS =====")
         print(f"Avg completion time: {avg_completion/60:.2f} min")
         print(f"Late orders: {late_pct:.2f}%")
         print(f"Total picker travel distance: {self.human_distance:.2f} meters")
+        print(f"Avg picker travel distance: {avg_picker_distance:.2f} meters")
         print(f"Total picker idle time: {self.human_idle/60:.2f} min")
+        print(f"Avg picker idle time: {avg_picker_idle/60:.2f} min")
         print(f"Human wait time for AMR: {self.human_wait_for_amr/60:.2f} min")
+        print(f"AMR wait time for human: {self.amr_wait_for_human/60:.2f} min")
+        print(f"Avg AMR wait time for human: {avg_amr_wait_for_human/60:.2f} min")
         print(f"Total AMR idle time: {self.amr_idle/60:.2f} min")
+        print(f"Avg AMR idle time: {avg_amr_idle/60:.2f} min")
         print(f"Average AMR utilization: {amr_util:.2f}%")
         print(f"Avg perishable exposure time: {avg_exposure/60:.2f} min")
         print(f"Spoiled perishables: {spoiled_pct:.2f}%")
@@ -209,9 +220,14 @@ class Simulation:
                 self.handle_end_flush()
 
         # Sum total idle times and output final metrics
+        end_time = self.time  # actual final processed time, may exceed nominal SIM_TIME due to flushed events
+        for p in self.pickers:
+            p.mark_busy(end_time)  # flush trailing idle into total_idle
+        for r in self.amrs:
+            r.mark_busy(end_time)
         self.metrics.human_idle = sum(p.total_idle for p in self.pickers)
         self.metrics.amr_idle = sum(r.total_idle for r in self.amrs)
-        self.metrics.finalize(params.SIM_TIME)
+        self.metrics.finalize(params.SIM_TIME, end_time)
 
     # Add an arriving order to the queue of pending orders, dispatching a batch once enough have piled up
     # Sends order to be batched

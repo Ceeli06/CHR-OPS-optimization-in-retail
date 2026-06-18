@@ -214,9 +214,14 @@ class ZoneFollow(models2.Simulation):
             picker_ready = picker.available_time
             amr_ready = amr.available_time + amr_arrival_time
             start_time = max(picker_ready, amr_ready)
-            amr_wait_for_human += max(0, picker_ready - amr_ready)
+            wait_for_human = max(0, picker_ready - amr_ready)
+            amr_wait_for_human += wait_for_human
             human_wait_for_amr += max(0, amr_ready - picker_ready)
             picker_time = start_time
+
+            if wait_for_human > 0:
+                amr.mark_idle(amr_ready)
+                amr.mark_busy(start_time)
 
             picker.mark_busy(start_time)
             prev_node = zonePath[0]

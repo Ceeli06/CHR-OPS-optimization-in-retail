@@ -194,6 +194,12 @@ class ShuttleSim(models.Simulation):
         self.metrics.human_wait_for_amr += human_wait
         self.metrics.human_idle += human_wait
 
+        amr_wait = max(0.0, picker_arrival - amr_arrival)
+        if amr and amr_wait > 0:
+            self.metrics.amr_wait_for_human += amr_wait
+            amr.mark_idle(amr_arrival)
+            amr.mark_busy(sync_start_time)
+
         route = self.build_decoupled_route(batch.orders, meeting_point)
         picking_distance = path_distance(route, self.dist_map)
 
