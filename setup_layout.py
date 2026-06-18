@@ -7,7 +7,6 @@ CATEGORYMAPPING = {
     "Grocery": 1,
     "Perishable Grocery": 2,
     "Health & Beauty": 3,
-    "Misc.": 4,
     "Miscellaneous": 4,
     "Fashion": 5,
     "Home": 6,
@@ -59,8 +58,8 @@ def setup_medium():
 
 
 # Load the small store layout from file
-def setup_small():
-    with open("Layouts/small.txt", "r") as f:
+def setup_revised():
+    with open("Layouts/revisedLayout.txt", "r") as f:
         small_layout = f.read()
         return layout_to_array(small_layout)
 
