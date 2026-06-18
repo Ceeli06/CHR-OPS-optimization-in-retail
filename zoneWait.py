@@ -259,19 +259,42 @@ class ZoneWait(models.Simulation):
             #amr visits the furthest zone first then comes back to the zone containing perishables last
             zone_ids = sorted(route.keys(), reverse=True)
             amr_time = self.time
-
-            # staging -> first zone
-            first_zone = zone_ids[0]
-
-            travel_dist = path_distance(
-                [self.staging, self.handoffPoints[first_zone]],
-                self.dist_map
-            )
-
-            amr_time += travel_dist / params.AMR_SPEED
+            active_amr = amr
+            items_carried = 0
+            current_amr_node = self.staging
 
             # visit zones sequentially
             for idx, zone_id in enumerate(zone_ids):
+                zone_items = len(batch.zoned_orders[zone_id])
+
+                # If this zone's items would overflow the active AMR's remaining
+                # capacity, swap to a replacement before traveling to this zone
+                if items_carried > 0 and items_carried + zone_items > params.AMR_CAPACITY:
+                    return_dist, return_time, unload_time = self.amr_return_leg(current_amr_node, items_carried)
+                    active_amr.available_time = amr_time + return_time + unload_time
+                    active_amr.mark_idle(active_amr.available_time)
+                    self.metrics.amr_distance += return_dist
+
+                    candidates = [a for a in self.amrs if a is not active_amr]
+                    replacement = min(candidates, key=lambda a: a.available_time) if candidates else active_amr
+                    swap_dist = path_distance([self.staging, self.handoffPoints[zone_id]], self.dist_map)
+                    swap_wait = max(0.0, replacement.available_time - amr_time) + swap_dist / params.AMR_SPEED
+                    amr_time += swap_wait
+                    human_wait_time += swap_wait
+                    self.metrics.amr_distance += swap_dist
+                    self.metrics.amr_hot_swaps += 1
+
+                    replacement.mark_busy(amr_time)
+                    active_amr = replacement
+                    items_carried = 0
+                    current_amr_node = self.handoffPoints[zone_id]
+                else:
+                    travel_dist = path_distance(
+                        [current_amr_node, self.handoffPoints[zone_id]], self.dist_map
+                    )
+                    amr_time += travel_dist / params.AMR_SPEED
+                    self.metrics.amr_distance += travel_dist
+                    current_amr_node = self.handoffPoints[zone_id]
 
                 picker_finish = picker_finish_times[zone_id]
 
@@ -281,8 +304,8 @@ class ZoneWait(models.Simulation):
                     wait = picker_finish - arrival_time
                     amr_wait_time += wait
                     amr_time += wait
-                    amr.mark_idle(arrival_time)
-                    amr.mark_busy(amr_time)
+                    active_amr.mark_idle(arrival_time)
+                    active_amr.mark_busy(amr_time)
 
                 else:
                     # Picker finished before AMR arrived
@@ -290,34 +313,16 @@ class ZoneWait(models.Simulation):
 
                 # Handoff/loading time
                 amr_time += params.AMR_LOAD_TIME
+                items_carried += zone_items
 
-                # Travel to next zone
-                if idx < len(zone_ids) - 1:
-
-                    next_zone = zone_ids[idx + 1]
-
-                    travel_dist = path_distance(
-                        [
-                            self.handoffPoints[zone_id],
-                            self.handoffPoints[next_zone]
-                        ],
-                        self.dist_map
-                    )
-
-                    amr_time += travel_dist / params.AMR_SPEED
-
-            # Last zone -> staging
-            last_zone = zone_ids[-1]
-
-            travel_dist = path_distance(
-                [self.handoffPoints[last_zone], self.staging],
-                self.dist_map
-            )
-
-            amr_time += travel_dist / params.AMR_SPEED
+            # Last zone to staging
+            return_dist, return_time, unload_time = self.amr_return_leg(current_amr_node, items_carried)
+            amr_time += return_time + unload_time
+            self.metrics.amr_distance += return_dist
 
             amr_finish_time = amr_time
-            amr.available_time = amr_finish_time
+            active_amr.available_time = amr_finish_time
+            active_amr.mark_idle(amr_finish_time)
 
         else:
             # zone-follow mode or no AMR

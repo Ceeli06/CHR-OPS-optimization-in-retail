@@ -262,41 +262,56 @@ class ZoneDivided(models.Simulation):
 
             # Whichever zone's picker finishes first claims an AMR first
             for zone_id in sorted(route.keys(), key=lambda z: picker_finish_times[z]):
-                amr_id = min(tentative_available, key=tentative_available.get)
-                zone_amr = amr_by_id[amr_id]
-
-                departure = max(tentative_available[amr_id], self.time)
-                zone_amr.mark_busy(departure)
-
-                to_zone_dist = path_distance(
-                    [self.staging, self.handoffPoints[zone_id]], self.dist_map
-                )
-                arrival = departure + to_zone_dist / params.AMR_SPEED
-
                 picker_finish = picker_finish_times[zone_id]
-                if arrival < picker_finish:
-                    # AMR arrived before this zone's picker finished
-                    amr_wait_time += picker_finish - arrival
-                    zone_amr.mark_idle(arrival)
-                    zone_amr.mark_busy(picker_finish)
-                else:
-                    # Picker finished before the AMR arrived
-                    human_wait_time += arrival - picker_finish
+                zone_item_count = len(batch.zoned_orders[zone_id])
+                num_trips = max(1, math.ceil(zone_item_count / params.AMR_CAPACITY))
+                # Split items as evenly as possible across the trips needed to stay under capacity
+                base, extra = divmod(zone_item_count, num_trips)
+                trip_sizes = [base + (1 if i < extra else 0) for i in range(num_trips)]
 
-                pickup_time = max(arrival, picker_finish)
-                loaded_time = pickup_time + params.AMR_LOAD_TIME
+                last_delivery_time = picker_finish
+                for trip_idx, trip_items in enumerate(trip_sizes):
+                    amr_id = min(tentative_available, key=tentative_available.get)
+                    zone_amr = amr_by_id[amr_id]
 
-                back_dist = path_distance(
-                    [self.handoffPoints[zone_id], self.staging], self.dist_map
-                )
-                delivery_time = loaded_time + back_dist / params.AMR_SPEED
+                    departure = max(tentative_available[amr_id], self.time)
+                    zone_amr.mark_busy(departure)
 
-                zone_amr.mark_idle(delivery_time)
-                zone_amr.available_time = delivery_time
-                tentative_available[amr_id] = delivery_time
+                    to_zone_dist = path_distance(
+                        [self.staging, self.handoffPoints[zone_id]], self.dist_map
+                    )
+                    arrival = departure + to_zone_dist / params.AMR_SPEED
 
-                zone_delivery_time[zone_id] = delivery_time
-                amr_distance_total += to_zone_dist + back_dist
+                    # Only the first trip needs to wait on the picker (further trips just need
+                    # an AMR available, since the picker already dropped off all the items)
+                    ready_time = picker_finish if trip_idx == 0 else last_delivery_time
+
+                    if arrival < ready_time:
+                        amr_wait_time += ready_time - arrival
+                        zone_amr.mark_idle(arrival)
+                        zone_amr.mark_busy(ready_time)
+                    else:
+                        human_wait_time += arrival - ready_time
+
+                    pickup_time = max(arrival, ready_time)
+                    loaded_time = pickup_time + params.AMR_LOAD_TIME
+
+                    back_dist = path_distance(
+                        [self.handoffPoints[zone_id], self.staging], self.dist_map
+                    )
+                    unload_time = params.AMR_UNLOAD_TIME * trip_items
+                    delivery_time = loaded_time + back_dist / params.AMR_SPEED + unload_time
+
+                    zone_amr.mark_idle(delivery_time)
+                    zone_amr.available_time = delivery_time
+                    tentative_available[amr_id] = delivery_time
+
+                    last_delivery_time = delivery_time
+                    amr_distance_total += to_zone_dist + back_dist
+                    if num_trips > 1:
+                        self.metrics.amr_hot_swaps += 1
+
+                zone_delivery_time[zone_id] = last_delivery_time
         else:
             for zone_id in route.keys():
                 zone_delivery_time[zone_id] = picker_finish_times[zone_id]

@@ -203,6 +203,8 @@ class ZoneFollow(models.Simulation):
         prev_amr_coord = self.staging
         amr_wait_for_human = 0
         human_wait_for_amr = 0
+        active_amr = amr
+        items_carried = 0
 
         for zone_id in sorted(route.keys(), reverse=True):
             zonePath = route[zone_id]
@@ -220,8 +222,8 @@ class ZoneFollow(models.Simulation):
             picker_time = start_time
 
             if wait_for_human > 0:
-                amr.mark_idle(amr_ready)
-                amr.mark_busy(start_time)
+                active_amr.mark_idle(amr_ready)
+                active_amr.mark_busy(start_time)
 
             picker.mark_busy(start_time)
             prev_node = zonePath[0]
@@ -262,6 +264,30 @@ class ZoneFollow(models.Simulation):
                     decrement = sum(1 for c in order.coords if c == node)
                     order.items_remaining -= decrement
 
+                if amr:
+                    items_carried += sum(1 for o in unique_orders.values() for c in o.coords if c == node)
+
+                    if items_carried >= params.AMR_CAPACITY:
+                        # Full AMR heads back to staging to unload; doesn't block the picker
+                        return_dist, return_time, unload_time = self.amr_return_leg(node, items_carried)
+                        active_amr.available_time = picker_time + return_time + unload_time
+                        active_amr.mark_idle(active_amr.available_time)
+                        self.metrics.amr_distance += return_dist
+
+                        # AMR is replaced
+                        candidates = [a for a in self.amrs if a is not active_amr]
+                        replacement = min(candidates, key=lambda a: a.available_time) if candidates else active_amr
+                        swap_dist = path_distance([self.staging, node], self.dist_map)
+                        swap_wait = max(0.0, replacement.available_time - picker_time) + swap_dist / params.AMR_SPEED
+                        picker_time += swap_wait
+                        human_wait_for_amr += swap_wait
+                        self.metrics.amr_distance += swap_dist
+                        self.metrics.amr_hot_swaps += 1
+
+                        replacement.mark_busy(picker_time)
+                        active_amr = replacement
+                        items_carried = 0
+
                 prev_node = node
             # walking from last picking point to handoff point
             r, c = self.handoffPoints[zone_id]
@@ -271,10 +297,10 @@ class ZoneFollow(models.Simulation):
             picker_time += dist_last_to_zone_center / min(params.WALKING_SPEED, params.AMR_SPEED)
             picker.available_time = picker_time
             picker_finish_times[zone_id]= picker_time
-            amr.available_time = picker_time
+            active_amr.available_time = picker_time
             picker.mark_idle(picker_time)
 
-        amr_finish_time = amr.available_time
+        amr_finish_time = active_amr.available_time
         # Last zone -> staging
         travel_dist = path_distance(
                 [prev_amr_coord, self.staging],
@@ -282,7 +308,11 @@ class ZoneFollow(models.Simulation):
             )
 
         amr_finish_time += travel_dist / params.AMR_SPEED
-        amr.available_time = amr_finish_time
+        if amr:
+            amr_finish_time += params.AMR_UNLOAD_TIME * items_carried
+            self.metrics.amr_distance += travel_dist
+        active_amr.available_time = amr_finish_time
+        active_amr.mark_idle(amr_finish_time)
         finish_time = amr_finish_time
       
         self.metrics.amr_wait_for_human += amr_wait_for_human

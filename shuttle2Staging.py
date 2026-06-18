@@ -223,6 +223,10 @@ class ShuttleSim(models.Simulation):
             for coord in order.coords:
                 coord_orders.setdefault(coord, []).append(order)
 
+        active_amr = amr
+        items_carried = 0
+        last_amr_node = meeting_point
+
         # Walk the route, picking items and updating order state at each stop
         for node in route:
             if node == self.staging:
@@ -250,6 +254,34 @@ class ShuttleSim(models.Simulation):
                 decrement = sum(1 for coord in order.coords if coord == node)
                 order.items_remaining -= decrement
 
+            if amr:
+                items_carried += sum(
+                    1 for order in orders_at_node for coord in order.coords if coord == node
+                )
+                last_amr_node = node
+
+                if items_carried >= params.AMR_CAPACITY:
+                    # Full AMR heads back to staging to unload; doesn't block the picker
+                    return_dist, return_time, unload_time = self.amr_return_leg(node, items_carried)
+                    active_amr.available_time = time_cursor + return_time + unload_time
+                    active_amr.mark_idle(active_amr.available_time)
+                    self.metrics.amr_distance += return_dist
+
+                    # AMR is replaced
+                    candidates = [a for a in self.amrs if a is not active_amr]
+                    replacement = min(candidates, key=lambda a: a.available_time) if candidates else active_amr
+                    swap_dist = path_distance([self.staging, node], self.dist_map)
+                    swap_wait = max(0.0, replacement.available_time - time_cursor) + swap_dist / params.AMR_SPEED
+                    time_cursor += swap_wait
+                    self.metrics.human_wait_for_amr += swap_wait
+                    self.metrics.human_idle += swap_wait
+                    self.metrics.amr_distance += swap_dist
+                    self.metrics.amr_hot_swaps += 1
+
+                    replacement.mark_busy(time_cursor)
+                    active_amr = replacement
+                    items_carried = 0
+
         last_item_location = meeting_point
         if (route):
             last_item_location = route[-1]
@@ -264,14 +296,14 @@ class ShuttleSim(models.Simulation):
         self.metrics.human_distance += total_human_distance
 
         if (amr):
-            # AMR ends the order at the staging location (drops items off dysynchronized from picker)
-            amr_return_dist = path_distance([last_item_location, self.staging], self.dist_map)
-            amr_return_time = amr_return_dist / params.AMR_SPEED
-            amr.available_time = time_cursor + amr_return_time
+            # AMR (whichever is currently active after any hot-swaps) ends the order at staging
+            amr_return_dist, amr_return_time, unload_time = self.amr_return_leg(last_amr_node, items_carried)
+            active_amr.available_time = time_cursor + amr_return_time + unload_time
+            active_amr.mark_idle(active_amr.available_time)
 
             total_amr_distance = amr_to_start_dist + picking_distance + amr_return_dist
             self.metrics.amr_distance += total_amr_distance
-            self.schedule(time_cursor + amr_return_time, "PICK_COMPLETE", batch)
+            self.schedule(active_amr.available_time, "PICK_COMPLETE", batch)
         else:
             self.schedule(time_cursor, "PICK_COMPLETE", batch)
 

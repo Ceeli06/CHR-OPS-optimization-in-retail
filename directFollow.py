@@ -115,6 +115,10 @@ class FollowSim(models.Simulation):
             for coord in order.coords:
                 coord_orders.setdefault(coord, []).append(order)
 
+        active_amr = amr
+        items_carried = 0
+        last_amr_node = self.staging
+
         # Walk the route, picking items and updating order state at each stop
         for node in route[
             1:-1
@@ -149,18 +153,52 @@ class FollowSim(models.Simulation):
                 if order.items_remaining <= 0 and order.completion_time is None:
                     order.completion_time = time_cursor
 
+            if amr:
+                items_carried += sum(
+                    1 for order in orders_at_node for coord in order.coords if coord == node
+                )
+                last_amr_node = node
+
+                if items_carried >= params.AMR_CAPACITY:
+                    # Full AMR heads back to staging to unload; doesn't block the picker
+                    return_dist, return_time, unload_time = self.amr_return_leg(node, items_carried)
+                    active_amr.available_time = time_cursor + return_time + unload_time
+                    active_amr.mark_idle(active_amr.available_time)
+                    self.metrics.amr_distance += return_dist
+
+                    # AMR is replaced
+                    candidates = [a for a in self.amrs if a is not active_amr]
+                    replacement = min(candidates, key=lambda a: a.available_time) if candidates else active_amr
+                    swap_dist = path_distance([self.staging, node], self.dist_map)
+                    swap_wait = max(0.0, replacement.available_time - time_cursor) + swap_dist / params.AMR_SPEED
+                    time_cursor += swap_wait
+                    self.metrics.human_wait_for_amr += swap_wait
+                    self.metrics.human_idle += swap_wait
+                    self.metrics.amr_distance += swap_dist
+                    self.metrics.amr_hot_swaps += 1
+
+                    replacement.mark_busy(time_cursor)
+                    active_amr = replacement
+                    items_carried = 0
+
         # Update walking distance of picker and global total
         picker.distance_walked += travel_distance
         self.metrics.human_distance += travel_distance
-        self.metrics.human_wait_for_amr = max(0, amr_travel_time - human_travel_time)
+        self.metrics.human_wait_for_amr += max(0, amr_travel_time - human_travel_time)
         self.metrics.human_idle += max(0, amr_travel_time - human_travel_time)
 
-        # Update picker avalible time and schedule a pick complete event
+        # Update picker available time; whichever AMR is currently active still has to
+        # travel back to staging and unload before it's free for its next dispatch
         finish_time = time_cursor
         picker.available_time = finish_time
+        pick_complete_time = finish_time
         if amr:
-            amr.available_time = finish_time
-        self.schedule(finish_time, "PICK_COMPLETE", batch)
+            return_dist, return_time, unload_time = self.amr_return_leg(last_amr_node, items_carried)
+            active_amr.available_time = time_cursor + return_time + unload_time
+            active_amr.mark_idle(active_amr.available_time)
+            self.metrics.amr_distance += return_dist
+            pick_complete_time = max(finish_time, active_amr.available_time)
+        self.schedule(pick_complete_time, "PICK_COMPLETE", batch)
 
 
 # Main experimentation space where testing occurs

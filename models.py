@@ -2,6 +2,7 @@ import params
 import heapq
 from dataclasses import dataclass
 from orderGen import generate_order_helper, generate_order_coords
+from setup_layout import path_distance
 
 
 # A customer order with items to be picked from the store
@@ -104,6 +105,7 @@ class Metrics:
         self.total_perishables = 0
         self.human_wait_for_amr = 0.0
         self.amr_wait_for_human = 0.0
+        self.amr_hot_swaps = 0
 
     # Record a completed order's comp.time and check if it missed the due time
     def record_completion(self, order: Order):
@@ -170,6 +172,7 @@ class Metrics:
         print(f"Avg perishable exposure time: {avg_exposure/60:.2f} min")
         print(f"Spoiled perishables: {spoiled_pct:.2f}%")
         print(f"Throughput: {throughput:.2f} orders/hour")
+        #print(f"AMR hot swaps: {self.amr_hot_swaps}")
 
 
 # Parent simulation class that policy-specific simulations inherit from
@@ -383,6 +386,13 @@ class Simulation:
                 if is_perishable_item:
                     perishable_coords.add(coord)
         return perishable_coords
+
+    # Distance,time, and unload time for an AMR returning to staging from from a node, carrying 'items_carried' items
+    def amr_return_leg(self, from_node, items_carried):
+        return_dist = path_distance([from_node, self.staging], self.dist_map)
+        return_time = return_dist / params.AMR_SPEED
+        unload_time = params.AMR_UNLOAD_TIME * items_carried
+        return return_dist, return_time, unload_time
 
     # Mark picker idle, record metrics for the completed batch, and schedule the next one if ready
     def handle_pick_complete(self, batch):
