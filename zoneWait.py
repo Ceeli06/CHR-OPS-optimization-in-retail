@@ -18,7 +18,7 @@ class ZoneWait(models2.Simulation):
         self, orders, pickers, amrs, coord_map, layout, staging=(0, 0), dist_map=None
     ):
         super().__init__(
-            orders, pickers, amrs, coord_map, layout, staging=staging, dist_map=dist_map
+            orders, pickers, amrs, coord_map, layout, False, staging=staging, dist_map=dist_map
         )
 
         self.zoneMap = self.coordinate_zoning(layout, coord_map)
@@ -160,10 +160,7 @@ class ZoneWait(models2.Simulation):
         if amr and amr.available_time > self.time:
             self.schedule(amr.available_time, "BATCH_DISPATCH", payload)
             return
-        #first picker check
-        if self.pickers[0].available_time > self.time:
-            self.schedule(self.pickers[0].available_time, "BATCH_DISPATCH", payload)
-            return
+        
 
         batch = self.create_batch(self.pickers, amr, force=force)
         if batch is None:
@@ -176,8 +173,8 @@ class ZoneWait(models2.Simulation):
         #    p.mark_busy(self.time)
 
         route = self.build_zoning_route(batch.zoned_orders) #doesn't include start: staging and end: staging
-       
-        human_travel_distance = sum(path_distance(zonePath, self.dist_map) for zonePath in route.values()) 
+        human_travel_distance = sum(path_distance(zonePath, self.dist_map) for zonePath in route.values())
+
 
         # sets up coordinate to order # (used later in metrics determination)
         coord_orders = {}
@@ -198,22 +195,22 @@ class ZoneWait(models2.Simulation):
 
         
         picker_finish_times = {}
-
-        for zone_id, zonePath in route.items():
+        
+        for zone_id in sorted(route.keys(), reverse=True):
+            zonePath = route[zone_id]
 
             picker = self.pickers[zone_id]
-
             start_time = max(self.time, picker.available_time)
             picker_time = start_time
 
-            picker.mark_busy(start_time)
+            picker.mark_busy(picker_time)
             prev_node = zonePath[0]
 
             for node in zonePath[1:-1]:
                 if node == self.staging:
                     break
                 walk_dist = self.dist_map[prev_node][node[0], node[1]]
-                walk_time = walk_dist / (params.WALKING_SPEED)
+                walk_time = walk_dist / (min(params.WALKING_SPEED, params.AMR_SPEED))
                 picker_time += walk_time
                 
                 
@@ -248,6 +245,7 @@ class ZoneWait(models2.Simulation):
             # walking from last picking point to handoff point
             r, c = self.handoffPoints[zone_id]
             dist_last_to_zone_center = dist_map[prev_node][r,c]
+            human_travel_distance += dist_last_to_zone_center
             picker_time += dist_last_to_zone_center / params.WALKING_SPEED
             picker.available_time = picker_time
             picker_finish_times[zone_id]= picker_time
@@ -259,7 +257,7 @@ class ZoneWait(models2.Simulation):
 
         if amr and route and not zoneFollow:
             #amr visits the furthest zone first then comes back to the zone containing perishables last
-            zone_ids = sorted(route.keys())
+            zone_ids = sorted(route.keys(), reverse=True)
             amr_time = self.time
 
             # staging -> first zone
@@ -328,7 +326,7 @@ class ZoneWait(models2.Simulation):
         self.metrics.amr_wait_for_human += amr_wait_time
         self.metrics.human_distance += human_travel_distance
         self.metrics.human_wait_for_amr += human_wait_time
-        self.metrics.human_idle += self.metrics.human_wait_for_amr
+        self.metrics.human_idle += human_wait_time
         finish_time = max(
             max(picker_finish_times.values(), default=self.time),
             amr_finish_time

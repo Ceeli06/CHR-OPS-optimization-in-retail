@@ -154,13 +154,13 @@ def zone_path_dist(zonePath, dist_map):
     return total
 
 
-#def zone_amr_dist(zonePath, dist_map, staging):
-#    path = [staging]
-#    for i in zonePath.keys():
-#        coord = zonePath[i][0]
-#        path.append(coord)
-#    path.append(staging)
-#    return path_distance(path, dist_map)
+def zone_amr_dist(zonePath, dist_map, staging):
+    path = [staging]
+    for i in zonePath.keys():
+        coord = zonePath[i][0]
+        path.append(coord)
+    path.append(staging)
+    return path_distance(path, dist_map)
 
 
 def get_path(orders, dist_map, staging, map):
