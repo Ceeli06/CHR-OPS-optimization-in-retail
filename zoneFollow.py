@@ -221,7 +221,7 @@ class ZoneFollow(models.Simulation):
             human_wait_for_amr += max(0, amr_ready - picker_ready)
             picker_time = start_time
 
-            if wait_for_human > 0:
+            if wait_for_human > 0 and active_amr:
                 active_amr.mark_idle(amr_ready)
                 active_amr.mark_busy(start_time)
 
@@ -297,23 +297,27 @@ class ZoneFollow(models.Simulation):
             picker_time += dist_last_to_zone_center / min(params.WALKING_SPEED, params.AMR_SPEED)
             picker.available_time = picker_time
             picker_finish_times[zone_id]= picker_time
-            active_amr.available_time = picker_time
+            if active_amr:
+                active_amr.available_time = picker_time
             picker.mark_idle(picker_time)
 
-        amr_finish_time = active_amr.available_time
-        # Last zone -> staging
-        travel_dist = path_distance(
-                [prev_amr_coord, self.staging],
-                self.dist_map
-            )
-
-        amr_finish_time += travel_dist / params.AMR_SPEED
         if amr:
+            amr_finish_time = active_amr.available_time
+            # Last zone -> staging
+            travel_dist = path_distance(
+                    [prev_amr_coord, self.staging],
+                    self.dist_map
+                )
+
+            amr_finish_time += travel_dist / params.AMR_SPEED
             amr_finish_time += params.AMR_UNLOAD_TIME * items_carried
             self.metrics.amr_distance += travel_dist
-        active_amr.available_time = amr_finish_time
-        active_amr.mark_idle(amr_finish_time)
-        finish_time = amr_finish_time
+            active_amr.available_time = amr_finish_time
+            active_amr.mark_idle(amr_finish_time)
+            finish_time = amr_finish_time
+        else:
+            # no AMR: batch finishes when the last picker finishes (mirrors zoneWait.py's no-AMR fallback)
+            finish_time = max(picker_finish_times.values(), default=self.time)
       
         self.metrics.amr_wait_for_human += amr_wait_for_human
         self.metrics.human_distance += human_travel_distance
@@ -337,7 +341,7 @@ if __name__ == "__main__":
 
     # Precompute list of orders
     raw_orders = generate_orders(
-        coord_map, params.SIM_TIME, layout, params.ORDER_ARRIVAL_RATE
+        coord_map, params.SIM_TIME, layout, params.order_arrival_rate
     )
     orders = [
         models.Order(

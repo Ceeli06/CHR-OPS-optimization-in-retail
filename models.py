@@ -156,6 +156,19 @@ class Metrics:
         avg_amr_wait_for_human = self.amr_wait_for_human / params.num_robots if params.num_robots else 0.0
         avg_amr_idle = self.amr_idle / params.num_robots if params.num_robots else 0.0
 
+        # Stored on self so callers (e.g. simDashboard.py) can read the derived
+        # metrics without re-deriving these formulas themselves
+        self.avg_completion = avg_completion
+        self.late_pct = late_pct
+        self.throughput = throughput
+        self.amr_util = amr_util
+        self.avg_exposure = avg_exposure
+        self.spoiled_pct = spoiled_pct
+        self.avg_picker_distance = avg_picker_distance
+        self.avg_picker_idle = avg_picker_idle
+        self.avg_amr_wait_for_human = avg_amr_wait_for_human
+        self.avg_amr_idle = avg_amr_idle
+
         print("\n===== METRICS =====")
         print(f"Avg completion time: {avg_completion/60:.2f} min")
         print(f"Late orders: {late_pct:.2f}%")

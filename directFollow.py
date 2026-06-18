@@ -212,7 +212,7 @@ if __name__ == "__main__":
 
     # Precompute list of orders
     raw_orders = generate_orders(
-        coord_map, params.SIM_TIME, layout, params.ORDER_ARRIVAL_RATE
+        coord_map, params.SIM_TIME, layout, params.order_arrival_rate
     )
     orders = [
         models.Order(

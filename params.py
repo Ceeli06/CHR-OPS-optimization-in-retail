@@ -2,11 +2,9 @@
 num_pickers = 1
 num_robots = 3
 num_customers = 100  # Representative of store congestion
-pLambda = 300.0 # Lambda for arrivalTimeGen's Poisson process (pLambda DOWN == orderChance UP)
+order_arrival_rate = 1 / 300.0  # Avg. orders per second for arrivalTimeGen's Poisson process (default:1/300sec{1/5min or 12/hr}))
 
 """Constants"""
-# Average number of orders per second (avg. 1 order per "pLambda" seconds)
-ORDER_ARRIVAL_RATE = 1 / pLambda
 # Perishable items must reach depot within this time or spoil
 FREEZER_PERISHABLE_TIME = 30 * 60  # 30 minutes
 # Orders exceeding this time are marked late
