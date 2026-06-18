@@ -71,7 +71,7 @@ class AMR:
 class Customer:
     id: int
     location: tuple # current position of customer
-    shopping_coords: set = None # current order coords
+    visits: dict = None # arrival_time and departure_time of coords for the customer's current trip
     available_time: float = 0.0 # when current order is finished
 
 
@@ -132,7 +132,7 @@ class Metrics:
         # AMR utilization (ignored for manual policy since AMR not used)
         amr_util = (
             ((elapsed_time - ((self.amr_idle) / params.num_robots)) / elapsed_time) * 100
-            if elapsed_time > 0
+            if elapsed_time > 0 and params.num_robots
             else 0.0
         )
 
@@ -237,7 +237,7 @@ class Simulation:
                 self.handle_end_flush()
 
         # Sum total idle times and output final metrics
-        end_time = self.time  # actual final processed time, may exceed nominal SIM_TIME due to flushed events
+        end_time = self.time  # actual final processed time, may exceed actual SIM_TIME due to flushed events
         for p in self.pickers:
             p.mark_busy(end_time)  # flush trailing idle into total_idle
         for r in self.amrs:
@@ -274,27 +274,35 @@ class Simulation:
             self.schedule(self.time + 60.0, "CUSTOMER_SHOPPING_COMPLETE", customer)
             return
 
-        route = [customer.location] + coords
-        travel_distance = sum(
-            self.dist_map[route[i]][route[i + 1][0], route[i + 1][1]]
-            for i in range(len(route) - 1)
-        )
-        travel_time = travel_distance / params.CUSTOMER_SPEED
-        browse_time = len(coords) * params.CUSTOMER_BROWSE_TIME
-        total_time = max(travel_time + browse_time, 1.0)
+        visits = {}
+        time_cursor = self.time
+        prev_node = customer.location
+        for coord in coords:
+            travel_dist = self.dist_map[prev_node][coord[0], coord[1]]
+            time_cursor += travel_dist / params.CUSTOMER_SPEED
+            arrival = time_cursor
+            time_cursor += params.CUSTOMER_BROWSE_TIME
+            visits[coord] = (arrival, time_cursor)
+            prev_node = coord
 
-        customer.shopping_coords = set(coords)
+        customer.visits = visits
         customer.location = coords[-1]
-        customer.available_time = self.time + total_time
+        customer.available_time = time_cursor
         self.schedule(customer.available_time, "CUSTOMER_SHOPPING_COMPLETE", customer)
 
-    # Checks all customer paths for the batch with the AMRs route and returns 
-    # the total pause time from collisions with customers sharing an item location somewhere on their path
-    def customer_collisions(self, route_waypoints):
-        route_set = set(route_waypoints)
+    # Checks whether an AMR occupying coord from arrival_time to departure_time overlaps (within
+    # CUSTOMER_COLLISION_BUFFER seconds of margin) any customer's visit window at that same coord
+    def customer_collisions(self, coord, arrival_time, departure_time):
         pause = 0.0
         for customer in self.customers:
-            if customer.shopping_coords and (customer.shopping_coords & route_set):
+            if not customer.visits:
+                continue
+            visit = customer.visits.get(coord)
+            if not visit:
+                continue
+            cust_arrival, cust_departure = visit
+            if (arrival_time - params.CUSTOMER_COLLISION_BUFFER <= cust_departure
+                    and cust_arrival <= departure_time + params.CUSTOMER_COLLISION_BUFFER):
                 pause += params.CUSTOMER_COLLISION_TIME
         return pause
 

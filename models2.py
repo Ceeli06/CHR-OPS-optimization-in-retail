@@ -1,6 +1,7 @@
 import params
 import heapq
 from dataclasses import dataclass
+from orderGen import generate_order_helper, generate_order_coords
 
 
 # A customer order with items to be picked from the store
@@ -65,6 +66,14 @@ class AMR:
             self.idle_start = current_time
 
 
+@dataclass
+class Customer:
+    id: int
+    location: tuple # current position of customer
+    visits: dict = None # arrival_time and departure_time of coords for the customer's current trip
+    available_time: float = 0.0 # when current order is finished
+
+
 # A set of orders grouped together for one picker to handle (6-8 per cart for manual)
 @dataclass
 class Batch:
@@ -122,7 +131,7 @@ class Metrics:
         # AMR utilization (ignored for manual policy since AMR not used)
         amr_util = (
             ((elapsed_time - (self.amr_idle / params.num_robots)) / elapsed_time) * 100
-            if elapsed_time > 0
+            if elapsed_time > 0 and params.num_robots
             else 0.0
         )
 
@@ -165,7 +174,7 @@ class Metrics:
 @dataclass
 class Simulation:
     def __init__(
-        self, orders, pickers, amrs, coord_map, layout, zoneFollow, staging=(0, 0), dist_map=None
+        self, orders, pickers, amrs, coord_map, layout, zoneFollow, staging=(0, 0), dist_map=None, customers=None
     ):
         self.time = 0.0
         self.event_queue = (
@@ -178,6 +187,7 @@ class Simulation:
 
         self.pickers = pickers
         self.amrs = amrs  # Unused in manual policy
+        self.customers = customers or []
 
         self.staging = staging
         self.dist_map = dist_map
@@ -189,6 +199,10 @@ class Simulation:
         # Sets up event queue for scheduling order events
         for order in self.orders:
             self.schedule(order.arrival_time, "ORDER_ARRIVAL", order)
+
+        # Schedules customer arrivals and initial orders
+        for customer in self.customers:
+            self.schedule(0.0, "CUSTOMER_SHOPPING_COMPLETE", customer)
 
         self.schedule(params.SIM_TIME, "SIM_END_FLUSH", None)
 
@@ -218,6 +232,8 @@ class Simulation:
                 self.handle_batch(payload, self.zoneFollow)  # NOTE: TRUE HERE FOR FOLLOWBASED
             elif event_type == "PICK_COMPLETE":
                 self.handle_pick_complete(payload)
+            elif event_type == "CUSTOMER_SHOPPING_COMPLETE":
+                self.handle_customer_shopping(payload)
             elif event_type == "SIM_END_FLUSH":
                 self.handle_end_flush()
 
@@ -246,6 +262,50 @@ class Simulation:
     def handle_end_flush(self):
         if self.pending_orders:
             self.schedule(self.time, "BATCH_DISPATCH", {"final": True})
+
+    # Customer generates a new random shopping order and walks it at CUSTOMER_SPEED, adding browse
+    # time at each stop, then immediately schedules another trip when done
+    def handle_customer_shopping(self, customer):
+        if self.dist_map is None or self.layout is None:
+            return
+
+        order = generate_order_helper()
+        coords = generate_order_coords(order["items"], self.map, self.layout)
+        if not coords:
+            self.schedule(self.time + 60.0, "CUSTOMER_SHOPPING_COMPLETE", customer)
+            return
+
+        visits = {}
+        time_cursor = self.time
+        prev_node = customer.location
+        for coord in coords:
+            travel_dist = self.dist_map[prev_node][coord[0], coord[1]]
+            time_cursor += travel_dist / params.CUSTOMER_SPEED
+            arrival = time_cursor
+            time_cursor += params.CUSTOMER_BROWSE_TIME
+            visits[coord] = (arrival, time_cursor)
+            prev_node = coord
+
+        customer.visits = visits
+        customer.location = coords[-1]
+        customer.available_time = time_cursor
+        self.schedule(customer.available_time, "CUSTOMER_SHOPPING_COMPLETE", customer)
+
+    # Checks whether an AMR occupying coord from arrival_time to departure_time overlaps (within
+    # CUSTOMER_COLLISION_BUFFER seconds of margin) any customer's visit window at that same coord
+    def customer_collisions(self, coord, arrival_time, departure_time):
+        pause = 0.0
+        for customer in self.customers:
+            if not customer.visits:
+                continue
+            visit = customer.visits.get(coord)
+            if not visit:
+                continue
+            cust_arrival, cust_departure = visit
+            if (arrival_time - params.CUSTOMER_COLLISION_BUFFER <= cust_departure
+                    and cust_arrival <= departure_time + params.CUSTOMER_COLLISION_BUFFER):
+                pause += params.CUSTOMER_COLLISION_TIME
+        return pause
 
     # Helper that returns a set of all department names in an order
     def department_set(self, order):

@@ -43,7 +43,7 @@ class ZoneWait(models2.Simulation):
             zone[r][c] = 0
 
         # splits remaining space by x-coordinate
-        zone_width = cols / numPickers
+        zone_width = cols / numPickers if numPickers else cols
 
         for r in range(rows):
             for c in range(cols):

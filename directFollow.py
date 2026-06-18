@@ -95,7 +95,7 @@ class FollowSim(models.Simulation):
         route = self.build_route(batch.orders)
         travel_distance = path_distance(route, self.dist_map)
         human_travel_time = travel_distance / params.WALKING_SPEED
-        amr_travel_time = travel_distance / params.AMR_SPEED + self.customer_collisions(route)
+        amr_travel_time = travel_distance / params.AMR_SPEED
 
         time_cursor = self.time + max(
             human_travel_time, amr_travel_time
@@ -126,6 +126,7 @@ class FollowSim(models.Simulation):
                 continue
             if amr:
                 pick_duration = len(orders_at_node) * params.AMR_LOAD_TIME
+                pick_duration += self.customer_collisions(node, time_cursor, time_cursor + pick_duration)
             else:
                 pick_duration = len(orders_at_node) * params.HUMAN_PICK_TIME
             if pick_duration > 0:

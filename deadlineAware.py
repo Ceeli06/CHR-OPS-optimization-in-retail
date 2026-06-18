@@ -203,7 +203,8 @@ class DeadlineSim(models.Simulation):
                 continue
             if (amr):
                 pick_duration = len(orders_at_node) * params.AMR_LOAD_TIME
-            else: 
+                pick_duration += self.customer_collisions(node, time_cursor, time_cursor + pick_duration)
+            else:
                 pick_duration = len(orders_at_node) * params.HUMAN_PICK_TIME
             if pick_duration > 0:
                 time_cursor += pick_duration # Update batch time every pick
@@ -270,6 +271,7 @@ if __name__ == "__main__":
 
     pickers = [models.Picker(i, staging) for i in range(params.num_pickers)]
     amrs = [models.AMR(i, staging) for i in range(params.num_robots)]
+    customers = [models.Customer(i, staging) for i in range(params.num_customers)]
 
-    sim = DeadlineSim(orders, pickers, amrs, coord_map, staging=staging, dist_map=dist_map)
+    sim = DeadlineSim(orders, pickers, amrs, coord_map, staging=staging, dist_map=dist_map, layout=layout, customers=customers)
     sim.run()

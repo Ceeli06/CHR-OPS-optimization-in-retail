@@ -12,8 +12,8 @@ from setup_layout import setup_medium, map_of_coords, get_path, path_distance, a
 class ShuttleSim(models.Simulation):
     num_zones = params.num_pickers
 
-    def __init__(self, orders, pickers, amrs, coord_map, layout, staging=(0, 0), dist_map=None):
-        super().__init__(orders, pickers, amrs, coord_map, staging=staging, dist_map=dist_map)
+    def __init__(self, orders, pickers, amrs, coord_map, layout, staging=(0, 0), dist_map=None, customers=None):
+        super().__init__(orders, pickers, amrs, coord_map, staging=staging, dist_map=dist_map, customers=customers)
         self.layout = layout
 
     def ensure_zone_state(self):
@@ -232,6 +232,7 @@ class ShuttleSim(models.Simulation):
                 continue
             if amr:
                 pick_duration = len(orders_at_node) * params.AMR_LOAD_TIME
+                pick_duration += self.customer_collisions(node, time_cursor, time_cursor + pick_duration)
             else:
                 pick_duration = len(orders_at_node) * params.HUMAN_PICK_TIME
             if pick_duration > 0:
@@ -300,6 +301,7 @@ if __name__ == "__main__":
 
     pickers = [models.Picker(i, staging) for i in range(params.num_pickers)]
     amrs = [models.AMR(i, staging) for i in range(params.num_robots)]
+    customers = [models.Customer(i, staging) for i in range(params.num_customers)]
 
-    sim = ShuttleSim(orders, pickers, amrs, coord_map, layout, staging=staging, dist_map=dist_map)
+    sim = ShuttleSim(orders, pickers, amrs, coord_map, layout, staging=staging, dist_map=dist_map, customers=customers)
     sim.run()

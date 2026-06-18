@@ -15,10 +15,10 @@ import math
 # Main DES simulation, where time advances only when events occur (arrivals, dispatches, completions)
 class ZoneFollow(models2.Simulation):
     def __init__(
-        self, orders, pickers, amrs, coord_map, layout, staging=(0, 0), dist_map=None
+        self, orders, pickers, amrs, coord_map, layout, staging=(0, 0), dist_map=None, customers=None
     ):
         super().__init__(
-            orders, pickers, amrs, coord_map, layout, True, staging=staging, dist_map=dist_map
+            orders, pickers, amrs, coord_map, layout, True, staging=staging, dist_map=dist_map, customers=customers
         )
 
         self.zoneMap = self.coordinate_zoning(layout, coord_map)
@@ -43,7 +43,7 @@ class ZoneFollow(models2.Simulation):
             zone[r][c] = 0
 
         # splits remaining space by x-coordinate
-        zone_width = cols / numPickers
+        zone_width = cols / numPickers if numPickers else cols
 
         for r in range(rows):
             for c in range(cols):
@@ -213,7 +213,7 @@ class ZoneFollow(models2.Simulation):
 
             picker_ready = picker.available_time
             amr_ready = amr.available_time + amr_arrival_time
-            start_time = max(picker_ready, amr_ready)
+            start_time = max(self.time, picker_ready, amr_ready)
             wait_for_human = max(0, picker_ready - amr_ready)
             amr_wait_for_human += wait_for_human
             human_wait_for_amr += max(0, amr_ready - picker_ready)
@@ -240,6 +240,7 @@ class ZoneFollow(models2.Simulation):
 
                 if zoneFollow:
                     pick_duration = len(orders_at_node) * params.AMR_LOAD_TIME
+                    pick_duration += self.customer_collisions(node, picker_time, picker_time + pick_duration)
                 else:
                     pick_duration = len(orders_at_node) * (params.HUMAN_PICK_TIME + params.AMR_LOAD_TIME) # accounts for moving items to AMR @ end
 
@@ -324,9 +325,10 @@ if __name__ == "__main__":
 
     pickers = [models2.Picker(i, staging) for i in range(params.num_pickers)]
     amrs = [models2.AMR(i, staging) for i in range(params.num_robots)]
+    customers = [models2.Customer(i, staging) for i in range(params.num_customers)]
 
     sim = ZoneFollow(
-        orders, pickers, amrs, coord_map, layout, staging=staging, dist_map=dist_map
+        orders, pickers, amrs, coord_map, layout, staging=staging, dist_map=dist_map, customers=customers
     )
     sim.coordinate_zoning(layout, coord_map)
     sim.run()
