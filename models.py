@@ -79,8 +79,9 @@ class Customer:
 @dataclass
 class Batch:
     orders: list
-    picker_id: int
-    amr_id: int
+    picker_id: int = None
+    amr_id: int = None
+    zoned_orders: dict = None
 
 
 # Utilities to collect and print key performance metrics at end of simulation
@@ -174,7 +175,7 @@ class Metrics:
 # Parent simulation class that policy-specific simulations inherit from
 @dataclass
 class Simulation:
-    def __init__(self, orders, pickers, amrs, coord_map, staging=(0, 0), dist_map=None, customers=None, layout=None):
+    def __init__(self, orders, pickers, amrs, coord_map, layout=None, zoneFollow=False, staging=(0, 0), dist_map=None, customers=None):
         self.time = 0.0
         self.event_queue = (
             []
@@ -194,6 +195,7 @@ class Simulation:
         self.layout = layout
         self.metrics = Metrics()
         self.map = coord_map
+        self.zoneFollow = zoneFollow
 
         # Sets up event queue for scheduling order events
         for order in self.orders:
@@ -385,8 +387,9 @@ class Simulation:
     # Mark picker idle, record metrics for the completed batch, and schedule the next one if ready
     def handle_pick_complete(self, batch):
         # Update picker
-        picker = self.pickers[batch.picker_id]
-        picker.mark_idle(self.time)
+        if batch.picker_id is not None:
+            picker = self.pickers[batch.picker_id]
+            picker.mark_idle(self.time)
         if batch.amr_id is not None:
             amr = self.amrs[batch.amr_id]
             amr.mark_idle(self.time)

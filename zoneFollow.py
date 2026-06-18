@@ -1,5 +1,5 @@
 import params
-import models2
+import models
 from orderGen import generate_orders, convert_to_walkable
 from setup_layout import (
     setup_medium,
@@ -13,7 +13,7 @@ import math
 
 
 # Main DES simulation, where time advances only when events occur (arrivals, dispatches, completions)
-class ZoneFollow(models2.Simulation):
+class ZoneFollow(models.Simulation):
     def __init__(
         self, orders, pickers, amrs, coord_map, layout, staging=(0, 0), dist_map=None, customers=None
     ):
@@ -105,7 +105,7 @@ class ZoneFollow(models2.Simulation):
         amrId = None
         if amr:
             amrId = amr.id
-        return models2.Batch(orders=batch_orders, zoned_orders = zoned_orders, amr_id=amrId)
+        return models.Batch(orders=batch_orders, zoned_orders = zoned_orders, amr_id=amrId)
 
     # Greedy order assignment, picking whichever picker becomes available earliest
     def select_picker(self):
@@ -139,7 +139,7 @@ class ZoneFollow(models2.Simulation):
         return route
     
     # Main order handling function which routes a batch, computes pick times, and schedules its completion
-    def handle_batch(self, payload, zoneFollow):
+    def handle_batch(self, payload):
         final = isinstance(payload, dict) and payload.get("final", False)
 
         timeout = (
@@ -212,7 +212,7 @@ class ZoneFollow(models2.Simulation):
             amr_arrival_time = (self.dist_map[prev_amr_coord][r,c]) / params.AMR_SPEED
 
             picker_ready = picker.available_time
-            amr_ready = amr.available_time + amr_arrival_time
+            amr_ready = self.time + amr_arrival_time
             start_time = max(self.time, picker_ready, amr_ready)
             wait_for_human = max(0, picker_ready - amr_ready)
             amr_wait_for_human += wait_for_human
@@ -238,7 +238,7 @@ class ZoneFollow(models2.Simulation):
                 if not orders_at_node:
                     continue
 
-                if zoneFollow:
+                if self.zoneFollow:
                     pick_duration = len(orders_at_node) * params.AMR_LOAD_TIME
                     pick_duration += self.customer_collisions(node, picker_time, picker_time + pick_duration)
                 else:
@@ -310,7 +310,7 @@ if __name__ == "__main__":
         coord_map, params.SIM_TIME, layout, params.ORDER_ARRIVAL_RATE
     )
     orders = [
-        models2.Order(
+        models.Order(
             id=raw_order["order_id"],
             arrival_time=raw_order["arrival_time"],
             items=raw_order["items"],
@@ -323,9 +323,9 @@ if __name__ == "__main__":
         for raw_order in raw_orders
     ]
 
-    pickers = [models2.Picker(i, staging) for i in range(params.num_pickers)]
-    amrs = [models2.AMR(i, staging) for i in range(params.num_robots)]
-    customers = [models2.Customer(i, staging) for i in range(params.num_customers)]
+    pickers = [models.Picker(i, staging) for i in range(params.num_pickers)]
+    amrs = [models.AMR(i, staging) for i in range(params.num_robots)]
+    customers = [models.Customer(i, staging) for i in range(params.num_customers)]
 
     sim = ZoneFollow(
         orders, pickers, amrs, coord_map, layout, staging=staging, dist_map=dist_map, customers=customers
