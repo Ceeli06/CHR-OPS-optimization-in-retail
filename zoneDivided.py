@@ -164,6 +164,9 @@ class ZoneDivided(models2.Simulation):
         batch = self.create_batch(self.pickers, None, force=force)
         if batch is None:
             return
+        
+        if amr:
+            amr.mark_busy(self.time)
 
         route = self.build_zoning_route(batch.zoned_orders)
 
