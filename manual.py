@@ -7,7 +7,7 @@ import models
 from dataclasses import dataclass
 from orderGen import generate_orders
 from setup_layout import (
-    setup_medium,
+    setup_layout,
     map_of_coords,
     path_distance,
     all_distance_maps,
@@ -140,7 +140,7 @@ class ManualSim(models.Simulation):
 # Main experimentation space where testing occurs
 if __name__ == "__main__":
     layout = (
-        setup_medium()
+        setup_layout()
     )  # Medium layout has all 16 departments, used as baseline before layout realism changes
     coord_map = map_of_coords(layout)
     dist_map = all_distance_maps(layout)  # Precompute distances for routing

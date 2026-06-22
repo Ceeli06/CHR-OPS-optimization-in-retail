@@ -43,25 +43,12 @@ def map_of_coords(layout):
     return dict(coord_map)
 
 
-# Load the large store layout from file
-def setup_large():
-    with open("Layouts/large.txt", "r") as f:
-        large_layout = f.read()
-        return layout_to_array(large_layout)
+# Load the layout from file
+def setup_layout():
+    with open("layout.txt", "r") as f:
+        layout = f.read()
+        return layout_to_array(layout)
 
-
-# Load the medium store layout from file (has all 16 departments)
-def setup_medium():
-    with open("Layouts/medium.txt", "r") as f:
-        medium_layout = f.read()
-        return layout_to_array(medium_layout)
-
-
-# Load the small store layout from file
-def setup_revised():
-    with open("Layouts/revisedLayout.txt", "r") as f:
-        small_layout = f.read()
-        return layout_to_array(small_layout)
 
 
 # Use BFS to compute shortest distance from one point to every reachable grid cell
