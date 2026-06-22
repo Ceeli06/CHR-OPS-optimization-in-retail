@@ -15,7 +15,7 @@ class ShuttleSim(models.Simulation):
     def __init__(self, orders, pickers, amrs, coord_map, layout, staging=(0, 0), dist_map=None):
         super().__init__(orders, pickers, amrs, coord_map, staging=staging, dist_map=dist_map)
         self.layout = layout
-
+    # NOTE: would move this into initiate so you always know on run that it exists rather than checking everytime
     def ensure_zone_state(self):
         if hasattr(self, "zone_grid"):
             return
@@ -23,7 +23,7 @@ class ShuttleSim(models.Simulation):
         self.handoff_points = self.build_handoff_points()
         self.zone_pending = {z: [] for z in range(self.num_zones)}
         self.picker_busy_time = {p.id: 0.0 for p in self.pickers}
-
+    # NOTE: may want to move this into models because the other zone policies also use it 
     def build_zone_grid(self):
         rows = len(self.layout)
         cols = len(self.layout[0])
@@ -48,6 +48,7 @@ class ShuttleSim(models.Simulation):
 
         return zone
 
+    # NOTE: may want to move this into models because the other zone policies also use it 
     def build_handoff_points(self):
         zone_cells = defaultdict(list)
         for r in range(len(self.zone_grid)):
