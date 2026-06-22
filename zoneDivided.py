@@ -301,8 +301,7 @@ class ZoneDivided(models2.Simulation):
         self.metrics.human_distance += human_travel_distance
         self.metrics.amr_distance += amr_distance_total
         self.metrics.human_wait_for_amr += human_wait_time
-        self.metrics.human_idle += self.metrics.human_wait_for_amr
-
+        self.metrics.human_idle += human_wait_time
         # An order isn't complete until every zone it touched has delivered its portion
         for order in batch.orders:
             if order.items_remaining <= 0 and order.completion_time is None:
