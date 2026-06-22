@@ -137,7 +137,6 @@ class DeadlineSim(models.Simulation):
         for order in batch.orders:
             all_coords.extend(order.coords)
         unique_coords = list(dict.fromkeys(all_coords))
-
         meeting_point = self.staging # First coord of first item in batch (where AMR/picker meet)
         if (unique_coords):
             meeting_point = unique_coords[0]
@@ -224,7 +223,7 @@ class DeadlineSim(models.Simulation):
         total_human_distance = picker_to_start_dist + picking_distance
         picker.distance_walked += total_human_distance
         self.metrics.human_distance += total_human_distance
-
+        self.batchCount +=1
         if (amr):
             # AMR ends the order at the staging location (drops items off dysynchronized from picker)
             amr_return_dist = path_distance([last_item_location, self.staging], self.dist_map)

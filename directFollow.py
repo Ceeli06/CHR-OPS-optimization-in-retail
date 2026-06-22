@@ -91,7 +91,7 @@ class FollowSim(models.Simulation):
         picker.mark_busy(self.time)
         if amr:
             amr.mark_busy(self.time)
-
+        self.batchCount +=1
         route = self.build_route(batch.orders)
         travel_distance = path_distance(route, self.dist_map)
         human_travel_time = travel_distance / params.WALKING_SPEED

@@ -134,6 +134,7 @@ class ManualSim(models.Simulation):
         # Update picker avalible time and schedule a pick complete event
         finish_time = time_cursor
         picker.available_time = finish_time
+        self.batchCount +=1
         self.schedule(finish_time, "PICK_COMPLETE", batch)
 
 

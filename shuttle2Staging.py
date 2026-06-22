@@ -170,7 +170,7 @@ class ShuttleSim(models.Simulation):
         batch = self.create_batch(zone, picker, amr, force=force)
         if batch is None:
             return
-
+        self.batchCount +=1
         dispatch_time = self.time
         picker.mark_busy(self.time)
         if amr:

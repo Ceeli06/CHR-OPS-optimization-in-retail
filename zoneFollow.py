@@ -152,11 +152,18 @@ class ZoneFollow(models2.Simulation):
             return
 
         amr = self.select_amr()
+        picker = self.pickers[-1]
+        
 
         # amr availability check
         if amr and amr.available_time > self.time:
             self.schedule(amr.available_time, "BATCH_DISPATCH", payload)
             return
+        
+        #checks for first zone picker availability
+        if picker.available_time > self.time:
+            self.schedule(picker.available_time, "BATCH_DISPATCH", payload)
+            return  
     
 
         batch = self.create_batch(self.pickers, amr, force=force)
@@ -166,7 +173,7 @@ class ZoneFollow(models2.Simulation):
         if amr:
             amr.mark_busy(self.time)
 
-
+        self.batchCount +=1
         route = self.build_zoning_route(batch.zoned_orders) #doesn't include start: staging and end: staging
         human_travel_distance = sum(path_distance(zonePath, self.dist_map) for zonePath in route.values())
 
@@ -200,6 +207,10 @@ class ZoneFollow(models2.Simulation):
             picker = self.pickers[zone_id]
             r, c = zonePath[0]
             amr_arrival_time = (self.dist_map[prev_amr_coord][r,c]) / params.AMR_SPEED
+            
+            
+            prev_amr_coord = self.handoffPoints[zone_id]
+            
 
             picker_ready = picker.available_time
             amr_ready = amr.available_time + amr_arrival_time
@@ -263,7 +274,6 @@ class ZoneFollow(models2.Simulation):
                 [self.handoffPoints[last_zone], self.staging],
                 self.dist_map
             )
-        print("travel_dist: ", travel_dist)
 
         amr_finish_time += travel_dist / params.AMR_SPEED
         amr.available_time = amr_finish_time

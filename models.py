@@ -172,6 +172,7 @@ class Simulation:
         self.dist_map = dist_map
         self.metrics = Metrics()
         self.map = coord_map
+        self.batchCount = 0
 
         # Sets up event queue for scheduling order events
         for order in self.orders:
@@ -207,6 +208,7 @@ class Simulation:
                 self.handle_pick_complete(payload)
             elif event_type == "SIM_END_FLUSH":
                 self.handle_end_flush()
+        print("batch count: ", self.batchCount)
 
         # Sum total idle times and output final metrics
         self.metrics.human_idle = sum(p.total_idle for p in self.pickers)

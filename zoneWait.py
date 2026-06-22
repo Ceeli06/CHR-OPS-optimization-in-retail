@@ -24,6 +24,7 @@ class ZoneWait(models2.Simulation):
         self.zoneMap = self.coordinate_zoning(layout, coord_map)
         self.handoffPoints = self.get_zone_handoff_points(self.zoneMap, layout)
 
+
     # returns a zone map where zone[r][c] gives zone # (also picker_id) of location (r,c)
     def coordinate_zoning(self, layout, coord_map):
         rows = len(layout)
@@ -153,12 +154,14 @@ class ZoneWait(models2.Simulation):
             return
 
         amr = self.select_amr()
+        
 
         # amr availability check
         if amr and amr.available_time > self.time:
             self.schedule(amr.available_time, "BATCH_DISPATCH", payload)
             return
         
+       
 
         batch = self.create_batch(self.pickers, amr, force=force)
         if batch is None:
@@ -169,6 +172,8 @@ class ZoneWait(models2.Simulation):
 
         route = self.build_zoning_route(batch.zoned_orders) #doesn't include start: staging and end: staging
         human_travel_distance = sum(path_distance(zonePath, self.dist_map) for zonePath in route.values())
+        self.batchCount +=1
+        
 
 
         # sets up coordinate to order # (used later in metrics determination)
@@ -327,6 +332,7 @@ class ZoneWait(models2.Simulation):
                 order.completion_time = finish_time
 
         self.schedule(finish_time, "PICK_COMPLETE", batch)
+        
 
 # Main experimentation space where testing occurs
 if __name__ == "__main__":
