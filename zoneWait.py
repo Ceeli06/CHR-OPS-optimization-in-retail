@@ -108,8 +108,6 @@ class ZoneWait(models2.Simulation):
         return models2.Batch(orders=batch_orders, zoned_orders = zoned_orders, amr_id=amrId)
 
     # Greedy order assignment, picking whichever picker becomes available earliest
-    def select_picker(self):
-        return min(self.pickers, key=lambda p: p.available_time)
 
     def select_amr(self):
         if len(self.amrs) == 0:

@@ -110,10 +110,7 @@ class ZoneDivided(models2.Simulation):
             amrId = amr.id
         return models2.Batch(orders=batch_orders, zoned_orders=zoned_orders, amr_id=amrId)
 
-    # Greedy order assignment, picking whichever picker becomes available earliest
-    def select_picker(self):
-        return min(self.pickers, key=lambda p: p.available_time)
-
+    # Greedy order assignment, picking whichever amr becomes available earliest
     def select_amr(self):
         if len(self.amrs) == 0:
             return
@@ -129,7 +126,7 @@ class ZoneDivided(models2.Simulation):
         route = get_path(unique_coords, self.dist_map, startEnd, self.map)
         if not route or route[-1] != startEnd:
             route.append(startEnd)
-
+        
         return route
 
     def build_zoning_route(self, zoned_orders):
@@ -137,7 +134,7 @@ class ZoneDivided(models2.Simulation):
 
         for zone_id, coords in zoned_orders.items():
             route[zone_id] = self.build_route(coords, self.handoffPoints[zone_id])
-
+        
         return route
 
     # Main order handling function which routes a batch, computes pick times, and schedules its completion
@@ -162,10 +159,7 @@ class ZoneDivided(models2.Simulation):
         if amr and amr.available_time > self.time:
             self.schedule(amr.available_time, "BATCH_DISPATCH", payload)
             return
-        # first picker check
-        if self.pickers[0].available_time > self.time:
-            self.schedule(self.pickers[0].available_time, "BATCH_DISPATCH", payload)
-            return
+        
 
         batch = self.create_batch(self.pickers, None, force=force)
         if batch is None:
