@@ -3,7 +3,6 @@ import models
 from orderGen import generate_orders
 from setup_layout import setup_layout, map_of_coords, get_path, path_distance, all_distance_maps
 
-URGENCY_THRESHOLD = 30 * 60 # Orders with remaining pick times under this threshold are auto-batched
 
 # Main DES simulation, where time advances only when events occur (arrivals, dispatches, completions)
 class DeadlineSim(models.Simulation):
@@ -29,7 +28,7 @@ class DeadlineSim(models.Simulation):
         # Filter orders by URGENCY_THRESHOLD
         for order in self.pending_orders:
             time_remaining = order.due_time - self.time
-            if time_remaining <= URGENCY_THRESHOLD:
+            if time_remaining <= params.URGENCY_THRESHOLD:
                 urgent_orders.append(order)
             else:
                 non_urgent_orders.append(order)
