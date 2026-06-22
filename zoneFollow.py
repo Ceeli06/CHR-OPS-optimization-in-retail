@@ -200,6 +200,7 @@ class ZoneFollow(models2.Simulation):
         prev_amr_coord = self.staging
         amr_wait_for_human = 0
         human_wait_for_amr = 0
+        amr_finished_picking_zone_time = amr.available_time
 
         for zone_id in sorted(route.keys(), reverse=True):
             zonePath = route[zone_id]
@@ -207,13 +208,11 @@ class ZoneFollow(models2.Simulation):
             picker = self.pickers[zone_id]
             r, c = zonePath[0]
             amr_arrival_time = (self.dist_map[prev_amr_coord][r,c]) / params.AMR_SPEED
-            
-            
             prev_amr_coord = self.handoffPoints[zone_id]
             
 
             picker_ready = picker.available_time
-            amr_ready = amr.available_time + amr_arrival_time
+            amr_ready = amr_finished_picking_zone_time + amr_arrival_time
             start_time = max(picker_ready, amr_ready)
             amr_wait_for_human += max(0, picker_ready - amr_ready)
             human_wait_for_amr += max(0, amr_ready - picker_ready)
@@ -258,13 +257,13 @@ class ZoneFollow(models2.Simulation):
                     order.items_remaining -= decrement
 
                 prev_node = node
-        
+
             picker.available_time = picker_time
             picker_finish_times[zone_id]= picker_time
-            amr.available_time = picker_time
+            amr_finished_picking_zone_time = picker_time
             picker.mark_idle(picker_time)
 
-        amr_finish_time = amr.available_time
+        amr_finish_time = amr_finished_picking_zone_time
         
         # Last zone -> staging
         zone_ids = sorted(route.keys(), reverse=True)
