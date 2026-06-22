@@ -1,7 +1,7 @@
 import params
 import models
 from orderGen import generate_orders
-from setup_layout import setup_medium, map_of_coords, get_path, path_distance, all_distance_maps
+from setup_layout import setup_layout, map_of_coords, get_path, path_distance, all_distance_maps
 
 URGENCY_THRESHOLD = 30 * 60 # Orders with remaining pick times under this threshold are auto-batched
 
@@ -239,7 +239,7 @@ class DeadlineSim(models.Simulation):
 
 # Main experimentation space where testing occurs
 if __name__ == "__main__":
-    layout = setup_medium()  # Medium layout has all 16 departments, used as baseline before layout realism changes
+    layout = setup_layout()  # Medium layout has all 16 departments, used as baseline before layout realism changes
     coord_map = map_of_coords(layout)
     dist_map = all_distance_maps(layout)  # Precompute distances for routing
     staging = coord_map["S"][0]

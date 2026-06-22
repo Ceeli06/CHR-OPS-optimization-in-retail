@@ -8,7 +8,7 @@ import params
 import models2
 from orderGen import generate_orders, convert_to_walkable
 from setup_layout import (
-    setup_medium,
+    setup_layout,
     map_of_coords,
     get_path,
     all_distance_maps,
@@ -319,7 +319,7 @@ class ZoneDivided(models2.Simulation):
 # Main experimentation space where testing occurs
 if __name__ == "__main__":
     layout = (
-        setup_medium()
+        setup_layout()
     )  # Medium layout has all 16 departments, used as baseline before layout realism changes
     coord_map = map_of_coords(layout)
     dist_map = all_distance_maps(layout)  # Precompute distances for routing

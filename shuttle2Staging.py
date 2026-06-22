@@ -8,7 +8,7 @@ import params
 import models
 from collections import defaultdict
 from orderGen import generate_orders, convert_to_walkable
-from setup_layout import setup_medium, map_of_coords, get_path, path_distance, all_distance_maps
+from setup_layout import setup_layout, map_of_coords, get_path, path_distance, all_distance_maps
 class ShuttleSim(models.Simulation):
     num_zones = params.num_pickers
 
@@ -271,7 +271,7 @@ class ShuttleSim(models.Simulation):
 
 # Main experimentation space where testing occurs
 if __name__ == "__main__":
-    layout = setup_medium()  # Medium layout has all 16 departments, used as baseline before layout realism changes
+    layout = setup_layout()  
     coord_map = map_of_coords(layout)
     dist_map = all_distance_maps(layout)  # Precompute distances for routing
     staging = coord_map["S"][0]
