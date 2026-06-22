@@ -254,11 +254,16 @@ class ZoneFollow(models2.Simulation):
             picker.mark_idle(picker_time)
 
         amr_finish_time = amr.available_time
+        
         # Last zone -> staging
+        zone_ids = sorted(route.keys(), reverse=True)
+        last_zone = zone_ids[-1]
+
         travel_dist = path_distance(
-                [prev_amr_coord, self.staging],
+                [self.handoffPoints[last_zone], self.staging],
                 self.dist_map
             )
+        print("travel_dist: ", travel_dist)
 
         amr_finish_time += travel_dist / params.AMR_SPEED
         amr.available_time = amr_finish_time
