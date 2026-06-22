@@ -1,7 +1,3 @@
-# Discrete-event simulation for a manual (human-only) retail order picking policy.
-# Orders arrive via Poisson process, are batched (6-8 per cart),
-# assigned to a picker, and routed using a greedy nearest-neighbor heuristic algorithm
-
 import params
 import heapq
 from dataclasses import dataclass
@@ -19,6 +15,7 @@ class Order:
     pick_start_time: float = None  # When picker first touches this order's items
     completion_time: float = None  # When all items are picked
 
+    due_time: float = 0.0
     perishable_coords: set = None  # Coords belonging to this order's perishable items
     perishable_picked_at: float = None  # When a perishable item was picked
 
@@ -53,6 +50,7 @@ class AMR:
     id: int
     location: tuple
     available_time: float = 0.0
+    distance_traveled: float = 0.0 # Enables desynchronized routing for deadlineAware scenario
     is_idle: bool = True
     idle_start: float = 0.0
     total_idle: float = 0.0
@@ -312,7 +310,7 @@ class Simulation:
         # Update picker
         picker = self.pickers[batch.picker_id]
         picker.mark_idle(self.time)
-        if batch.amr_id:
+        if batch.amr_id is not None:
             amr = self.amrs[batch.amr_id]
             amr.mark_idle(self.time)
 
