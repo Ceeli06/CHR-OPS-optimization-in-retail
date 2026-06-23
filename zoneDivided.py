@@ -229,10 +229,10 @@ class ZoneDivided(models.Simulation):
                     continue
 
                 if self.zoneFollow:
-                    pick_duration = len(orders_at_node) * params.AMR_LOAD_TIME
+                    pick_duration = len(orders_at_node) * params.CART_LOAD_TIME
                 else:
                     pick_duration = len(orders_at_node) * (
-                        params.HUMAN_PICK_TIME + params.AMR_LOAD_TIME
+                        params.HUMAN_PICK_TIME + params.CART_LOAD_TIME
                     )  # accounts for moving items to AMR @ end
 
                 picker_time += pick_duration
@@ -305,7 +305,7 @@ class ZoneDivided(models.Simulation):
                         human_wait_time += arrival - ready_time
 
                     pickup_time = max(arrival, ready_time)
-                    loaded_time = pickup_time + params.AMR_LOAD_TIME
+                    loaded_time = pickup_time + params.CART_LOAD_TIME
 
                     back_dist = path_distance(
                         [self.handoffPoints[zone_id], self.staging], self.dist_map

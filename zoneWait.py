@@ -222,10 +222,10 @@ class ZoneWait(models.Simulation):
                     continue
 
                 if self.zoneFollow:
-                    pick_duration = len(orders_at_node) * params.AMR_LOAD_TIME
+                    pick_duration = len(orders_at_node) * params.CART_LOAD_TIME
                 else:
                     pick_duration = len(orders_at_node) * (
-                        params.HUMAN_PICK_TIME + params.AMR_LOAD_TIME
+                        params.HUMAN_PICK_TIME + params.CART_LOAD_TIME
                     )  # accounts for moving items to AMR @ end
 
                 picker_time += pick_duration
@@ -327,7 +327,7 @@ class ZoneWait(models.Simulation):
                     human_wait_time += amr_time - picker_finish
 
                 # Handoff/loading time
-                amr_time += params.AMR_LOAD_TIME
+                amr_time += params.CART_LOAD_TIME
                 items_carried += zone_items
 
             # Last zone to staging

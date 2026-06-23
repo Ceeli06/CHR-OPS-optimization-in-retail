@@ -277,7 +277,7 @@ class ShuttleSim(models.Simulation):
             if not orders_at_node:
                 continue
             if amr:
-                pick_duration = len(orders_at_node) * params.AMR_LOAD_TIME
+                pick_duration = len(orders_at_node) * params.CART_LOAD_TIME
                 pick_duration += self.customer_collisions(
                     node, time_cursor, time_cursor + pick_duration
                 )

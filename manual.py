@@ -108,7 +108,9 @@ class ManualSim(models.Simulation):
             if not orders_at_node:
                 continue
 
-            pick_duration = len(orders_at_node) * params.HUMAN_PICK_TIME
+            pick_duration = len(orders_at_node) * (
+                params.HUMAN_PICK_TIME + params.CART_LOAD_TIME
+            )
             if pick_duration > 0:
                 time_cursor += pick_duration  # Update batch time every pick
 
