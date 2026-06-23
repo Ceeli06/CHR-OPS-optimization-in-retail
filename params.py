@@ -2,7 +2,7 @@
 
 num_pickers = 1
 num_robots = 3
-num_customers = 100  # Representative of store congestion
+num_customers = 30  # Representative of store congestion
 order_arrival_rate = (
     1 / 300.0
 )  # Avg. orders per second for arrivalTimeGen's Poisson process (default:1/300sec{1/5min or 12/hr}))
@@ -36,4 +36,3 @@ URGENCY_THRESHOLD = (
 MANUAL_PUSH_FACTOR = (
     0.8  # Factor that human walking speed is scaled by when pushing a manual cart
 )
-BATCH_TIMEOUT = 5 * 60  # 5 minutes

@@ -28,7 +28,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 import params
 import models
-from setup_layout import setup_medium, map_of_coords, all_distance_maps
+from setup_layout import setup_layout, map_of_coords, all_distance_maps
 from orderGen import generate_orders
 
 import manual
@@ -230,7 +230,7 @@ def build_run_context(layout, coord_map, dist_map, staging):
 def run_all_policies():
     # Builds shared layout/distance data, then runs every policy with a
     # fresh, identical seeded order set. Returns a dict keyed by policy name.
-    layout = setup_medium()
+    layout = setup_layout()
     coord_map = map_of_coords(layout)
     dist_map = all_distance_maps(layout)
     staging = coord_map["S"][0]
