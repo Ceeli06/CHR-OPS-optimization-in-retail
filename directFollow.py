@@ -145,17 +145,25 @@ class FollowSim(models.Simulation):
                     order.perishable_picked_at = time_cursor - pick_duration
                 decrement = sum(1 for coord in order.coords if coord == node)
                 order.items_remaining -= decrement  # Decrement items remaining in batch
-                if order.items_remaining <= 0 and order.completion_time is None:
-                    order.completion_time = time_cursor
+                #if order.items_remaining <= 0 and order.completion_time is None:
+                 #   order.completion_time = time_cursor
 
         # Update walking distance of picker and global total
         picker.distance_walked += travel_distance
         self.metrics.human_distance += travel_distance
         self.metrics.human_wait_for_amr = max(0, amr_travel_time - human_travel_time)
         self.metrics.human_idle += max(0, amr_travel_time - human_travel_time)
+        finish_time = time_cursor
+
+        # order is not complete until entire batch is returned to staging
+        for order in batch.orders:
+           if order.items_remaining == 0 and order.completion_time is None:
+                   order.completion_time = finish_time
+
+
 
         # Update picker avalible time and schedule a pick complete event
-        finish_time = time_cursor
+
         picker.available_time = finish_time
         if amr:
             amr.available_time = finish_time
