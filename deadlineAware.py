@@ -246,7 +246,7 @@ class DeadlineSim(models.Simulation):
                     self.metrics.human_wait_for_amr += swap_wait
                     self.metrics.human_idle += swap_wait
                     self.metrics.amr_distance += swap_dist
-                    self.metrics.amr_hot_swaps += 1
+                    self.metrics.amr_swap_count += 1
 
                     replacement.mark_busy(time_cursor)
                     active_amr = replacement
@@ -263,7 +263,7 @@ class DeadlineSim(models.Simulation):
         total_human_distance = picker_to_start_dist + picking_distance
         picker.distance_walked += total_human_distance
         self.metrics.human_distance += total_human_distance
-        self.batchCount +=1
+        self.metrics.batch_completion_count +=1
         if (amr):
             # AMR (whichever is currently active after any hot-swaps) ends the order at staging
             amr_return_dist, amr_return_time, unload_time = self.amr_return_leg(last_amr_node, items_carried)

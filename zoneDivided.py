@@ -326,6 +326,7 @@ class ZoneDivided(models.Simulation):
                     order.completion_time = max(zone_delivery_time[z] for z in zones)
 
         finish_time = max(zone_delivery_time.values(), default=self.time)
+        self.metrics.batch_completion_count+=1
         self.schedule(finish_time, "PICK_COMPLETE", batch)
 
 

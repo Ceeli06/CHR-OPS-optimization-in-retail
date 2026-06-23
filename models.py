@@ -213,7 +213,6 @@ class Simulation:
         self.layout = layout
         self.metrics = Metrics()
         self.map = coord_map
-        self.batchCount = 0
         self.zoneFollow = zoneFollow
 
         # Sets up event queue for scheduling order events
@@ -256,7 +255,6 @@ class Simulation:
                 self.handle_customer_shopping(payload)
             elif event_type == "SIM_END_FLUSH":
                 self.handle_end_flush()
-        print("batch count: ", self.batchCount)
 
         # Sum total idle times and output final metrics
         end_time = self.time  # actual final processed time, may exceed actual SIM_TIME due to flushed events

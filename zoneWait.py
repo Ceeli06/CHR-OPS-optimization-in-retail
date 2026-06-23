@@ -172,7 +172,7 @@ class ZoneWait(models.Simulation):
 
         route = self.build_zoning_route(batch.zoned_orders) #doesn't include start: staging and end: staging
         human_travel_distance = sum(path_distance(zonePath, self.dist_map) for zonePath in route.values())
-        self.batchCount +=1
+        self.metrics.batch_completion_count+=1
         
 
 

@@ -171,7 +171,7 @@ class ShuttleSim(models.Simulation):
         batch = self.create_batch(zone, picker, amr, force=force)
         if batch is None:
             return
-        self.batchCount +=1
+        self.metrics.batch_completion_count +=1
         dispatch_time = self.time
         picker.mark_busy(self.time)
         if amr:
@@ -277,7 +277,7 @@ class ShuttleSim(models.Simulation):
                     self.metrics.human_wait_for_amr += swap_wait
                     self.metrics.human_idle += swap_wait
                     self.metrics.amr_distance += swap_dist
-                    self.metrics.amr_hot_swaps += 1
+                    self.metrics.amr_swap_count += 1
 
                     replacement.mark_busy(time_cursor)
                     active_amr = replacement
