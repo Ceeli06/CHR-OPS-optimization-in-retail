@@ -80,7 +80,7 @@ class ManualSim(models.Simulation):
 
         route = self.build_route(batch.orders)
         travel_distance = path_distance(route, self.dist_map)
-        travel_time = travel_distance / params.WALKING_SPEED
+        travel_time = travel_distance / (params.WALKING_SPEED * params.MANUAL_PUSH_FACTOR) 
 
         time_cursor = self.time + travel_time  # Holds time from batch start to end
 

@@ -29,3 +29,4 @@ SIMILARITY_BATCH_MAX_WAIT = 90 * 60  # 1.5 hours
 # If the pending queue has been non-empty this long without reaching BATCH_SIZE_MIN, force a dispatch
 BATCH_TIMEOUT = 5 * 60  # 5 minutes
 URGENCY_THRESHOLD = 30 * 60 # Orders with remaining pick times under this threshold are auto-batched
+MANUAL_PUSH_FACTOR = 0.8 # Factor that human walking speed is scaled by when pushing a manual cart
