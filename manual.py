@@ -80,7 +80,9 @@ class ManualSim(models.Simulation):
 
         route = self.build_route(batch.orders)
         travel_distance = path_distance(route, self.dist_map)
-        travel_time = travel_distance / (params.WALKING_SPEED * params.MANUAL_PUSH_FACTOR) 
+        travel_time = travel_distance / (
+            params.WALKING_SPEED * params.MANUAL_PUSH_FACTOR
+        )
 
         time_cursor = self.time + travel_time  # Holds time from batch start to end
 
@@ -134,7 +136,7 @@ class ManualSim(models.Simulation):
         # Update picker avalible time and schedule a pick complete event
         finish_time = time_cursor
         picker.available_time = finish_time
-        self.batchCount +=1
+        self.batchCount += 1
         self.schedule(finish_time, "PICK_COMPLETE", batch)
 
 

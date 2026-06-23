@@ -50,7 +50,6 @@ def setup_layout():
         return layout_to_array(layout)
 
 
-
 # Use BFS to compute shortest distance from one point to every reachable grid cell
 def distance_map(grid, start):
     rows, cols = grid.shape

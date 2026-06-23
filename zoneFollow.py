@@ -15,10 +15,26 @@ import math
 # Main DES simulation, where time advances only when events occur (arrivals, dispatches, completions)
 class ZoneFollow(models.Simulation):
     def __init__(
-        self, orders, pickers, amrs, coord_map, layout, staging=(0, 0), dist_map=None, customers=None
+        self,
+        orders,
+        pickers,
+        amrs,
+        coord_map,
+        layout,
+        staging=(0, 0),
+        dist_map=None,
+        customers=None,
     ):
         super().__init__(
-            orders, pickers, amrs, coord_map, layout, True, staging=staging, dist_map=dist_map, customers=customers
+            orders,
+            pickers,
+            amrs,
+            coord_map,
+            layout,
+            True,
+            staging=staging,
+            dist_map=dist_map,
+            customers=customers,
         )
 
         self.zoneMap = self.coordinate_zoning(layout, coord_map)
@@ -77,8 +93,8 @@ class ZoneFollow(models.Simulation):
             coord = convert_to_walkable(coord, layout)
             handoff_points[zone_id] = coord
         return handoff_points
-    
-    # takes in a list of order coordinates (for one batch) and returns a list 
+
+    # takes in a list of order coordinates (for one batch) and returns a list
     # of the orders to which picker/zone they are assigned to (the index)
     def split_orders_into_zones(self, orders, zone_map):
         order_zones = defaultdict(list)
@@ -90,7 +106,6 @@ class ZoneFollow(models.Simulation):
                 order_zones[zone_id].append(coord)
         return order_zones
 
-
     def create_batch(self, pickers, amr, force=False):
         if not self.pending_orders:
             return None
@@ -99,13 +114,15 @@ class ZoneFollow(models.Simulation):
 
         batch_size = min(len(self.pending_orders), params.BATCH_SIZE_MAX)
         batch_orders, self.pending_orders = self.select_similar_batch(batch_size)
-       
+
         zoned_orders = self.split_orders_into_zones(batch_orders, self.zoneMap)
-    
+
         amrId = None
         if amr:
             amrId = amr.id
-        return models.Batch(orders=batch_orders, zoned_orders = zoned_orders, amr_id=amrId)
+        return models.Batch(
+            orders=batch_orders, zoned_orders=zoned_orders, amr_id=amrId
+        )
 
     # Greedy order assignment, picking whichever amr becomes available earliest
     def select_amr(self):
@@ -115,7 +132,7 @@ class ZoneFollow(models.Simulation):
 
     # Build a nearest-neighbor route for the batch from staging through all item locations and back
     def build_route(self, orders, startEnd):
-    
+
         unique_coords = list(dict.fromkeys(orders))
         if not unique_coords:
             return [startEnd]
@@ -123,18 +140,17 @@ class ZoneFollow(models.Simulation):
         route = get_path(unique_coords, self.dist_map, startEnd, self.map)
         if not route or route[-1] != startEnd:
             route.append(startEnd)
-        
-        return route
 
+        return route
 
     def build_zoning_route(self, zoned_orders):
         route = {}
 
         for zone_id, coords in zoned_orders.items():
             route[zone_id] = self.build_route(coords, self.handoffPoints[zone_id])
-        
+
         return route
-    
+
     # Main order handling function which routes a batch, computes pick times, and schedules its completion
     def handle_batch(self, payload):
         final = isinstance(payload, dict) and payload.get("final", False)
@@ -153,18 +169,16 @@ class ZoneFollow(models.Simulation):
 
         amr = self.select_amr()
         picker = self.pickers[-1]
-        
 
         # amr availability check
         if amr and amr.available_time > self.time:
             self.schedule(amr.available_time, "BATCH_DISPATCH", payload)
             return
-        
-        #checks for first zone picker availability
+
+        # checks for first zone picker availability
         if picker.available_time > self.time:
             self.schedule(picker.available_time, "BATCH_DISPATCH", payload)
-            return  
-    
+            return
 
         batch = self.create_batch(self.pickers, amr, force=force)
         if batch is None:
@@ -173,10 +187,13 @@ class ZoneFollow(models.Simulation):
         if amr:
             amr.mark_busy(self.time)
 
-        self.metrics.batch_completion_count +=1
-        route = self.build_zoning_route(batch.zoned_orders) #doesn't include start: staging and end: staging
-        human_travel_distance = sum(path_distance(zonePath, self.dist_map) for zonePath in route.values())
-
+        self.metrics.batch_completion_count += 1
+        route = self.build_zoning_route(
+            batch.zoned_orders
+        )  # doesn't include start: staging and end: staging
+        human_travel_distance = sum(
+            path_distance(zonePath, self.dist_map) for zonePath in route.values()
+        )
 
         # sets up coordinate to order # (used later in metrics determination)
         coord_orders = {}
@@ -195,7 +212,6 @@ class ZoneFollow(models.Simulation):
             for coord in order.coords:
                 coord_orders.setdefault(coord, []).append(order)
 
-        
         picker_finish_times = {}
         prev_amr_coord = self.staging
         amr_wait_for_human = 0
@@ -208,9 +224,8 @@ class ZoneFollow(models.Simulation):
 
             picker = self.pickers[zone_id]
             r, c = zonePath[0]
-            amr_arrival_time = (self.dist_map[prev_amr_coord][r,c]) / params.AMR_SPEED
+            amr_arrival_time = (self.dist_map[prev_amr_coord][r, c]) / params.AMR_SPEED
             prev_amr_coord = self.handoffPoints[zone_id]
-            
 
             picker_ready = picker.available_time
             amr_ready = amr_finished_picking_prev_zone_time + amr_arrival_time
@@ -234,18 +249,23 @@ class ZoneFollow(models.Simulation):
                 walk_dist = self.dist_map[prev_node][node[0], node[1]]
                 walk_time = walk_dist / (min(params.WALKING_SPEED, params.AMR_SPEED))
                 picker_time += walk_time
-                
-                
+
                 orders_at_node = coord_orders.get(node, [])
                 if not orders_at_node:
                     continue
 
                 if self.zoneFollow:
                     pick_duration = len(orders_at_node) * params.AMR_LOAD_TIME
-                    pick_duration += self.customer_collisions(node, picker_time, picker_time + pick_duration)
+                    pick_duration += self.customer_collisions(
+                        node, picker_time, picker_time + pick_duration
+                    )
                 else:
-                    pick_duration = len(orders_at_node) * (params.HUMAN_PICK_TIME + params.AMR_LOAD_TIME) # accounts for moving items to AMR @ end
-                    pick_duration += self.customer_collisions(node, picker_time, picker_time + pick_duration)
+                    pick_duration = len(orders_at_node) * (
+                        params.HUMAN_PICK_TIME + params.AMR_LOAD_TIME
+                    )  # accounts for moving items to AMR @ end
+                    pick_duration += self.customer_collisions(
+                        node, picker_time, picker_time + pick_duration
+                    )
 
                 picker_time += pick_duration
 
@@ -266,21 +286,28 @@ class ZoneFollow(models.Simulation):
                     order.items_remaining -= decrement
 
                 if amr:
-                    items_carried += sum(1 for o in unique_orders.values() for c in o.coords if c == node)
+                    items_carried += sum(
+                        1 for o in unique_orders.values() for c in o.coords if c == node
+                    )
 
                     if items_carried >= params.AMR_CAPACITY:
                         # Full AMR heads back to staging to unload; doesn't block the picker
-                        return_dist, return_time, unload_time = self.amr_return_leg(node, items_carried)
+                        return_dist, return_time, unload_time = self.amr_return_leg(
+                            node, items_carried
+                        )
                         amr.available_time = picker_time + return_time + unload_time
                         amr.mark_idle(amr.available_time)
                         self.metrics.amr_distance += return_dist
 
                         # AMR is replaced with the AMR that is available first (could also be the case it isn't replaced)
-                        
+
                         candidates = [a for a in self.amrs]
                         replacement = min(candidates, key=lambda a: a.available_time)
                         swap_dist = path_distance([self.staging, node], self.dist_map)
-                        swap_wait = max(0.0, replacement.available_time - picker_time) + swap_dist / params.AMR_SPEED
+                        swap_wait = (
+                            max(0.0, replacement.available_time - picker_time)
+                            + swap_dist / params.AMR_SPEED
+                        )
                         picker_time += swap_wait
                         human_wait_for_amr += swap_wait
                         self.metrics.amr_distance += swap_dist
@@ -293,7 +320,7 @@ class ZoneFollow(models.Simulation):
                 prev_node = node
 
             picker.available_time = picker_time
-            picker_finish_times[zone_id]= picker_time
+            picker_finish_times[zone_id] = picker_time
             amr_finished_picking_zone_time = picker_time
             picker.mark_idle(picker_time)
 
@@ -303,28 +330,27 @@ class ZoneFollow(models.Simulation):
         last_zone = zone_ids[-1]
 
         travel_dist = path_distance(
-                [self.handoffPoints[last_zone], self.staging],
-                self.dist_map
-            )
-        
+            [self.handoffPoints[last_zone], self.staging], self.dist_map
+        )
+
         amr_finish_time += travel_dist / params.AMR_SPEED
         amr_finish_time += params.AMR_UNLOAD_TIME * items_carried
         self.metrics.amr_distance += travel_dist
         amr.available_time = amr_finish_time
         amr.mark_idle(amr_finish_time)
         finish_time = amr_finish_time
-        
-      
+
         self.metrics.amr_wait_for_human += amr_wait_for_human
         self.metrics.human_distance += human_travel_distance
         self.metrics.human_wait_for_amr += human_wait_for_amr
         self.metrics.human_idle += human_wait_for_amr
-        
+
         for order in batch.orders:
             if order.items_remaining <= 0 and order.completion_time is None:
                 order.completion_time = finish_time
 
         self.schedule(finish_time, "PICK_COMPLETE", batch)
+
 
 # Main experimentation space where testing occurs
 if __name__ == "__main__":
@@ -358,7 +384,14 @@ if __name__ == "__main__":
     customers = [models.Customer(i, staging) for i in range(params.num_customers)]
 
     sim = ZoneFollow(
-        orders, pickers, amrs, coord_map, layout, staging=staging, dist_map=dist_map, customers=customers
+        orders,
+        pickers,
+        amrs,
+        coord_map,
+        layout,
+        staging=staging,
+        dist_map=dist_map,
+        customers=customers,
     )
     sim.coordinate_zoning(layout, coord_map)
     sim.run()

@@ -8,13 +8,40 @@ import params
 import models
 from collections import defaultdict
 from orderGen import generate_orders, convert_to_walkable
-from setup_layout import setup_layout, map_of_coords, get_path, path_distance, all_distance_maps
+from setup_layout import (
+    setup_layout,
+    map_of_coords,
+    get_path,
+    path_distance,
+    all_distance_maps,
+)
+
+
 class ShuttleSim(models.Simulation):
     num_zones = params.num_pickers
 
-    def __init__(self, orders, pickers, amrs, coord_map, layout, staging=(0, 0), dist_map=None, customers=None):
-        super().__init__(orders, pickers, amrs, coord_map, staging=staging, dist_map=dist_map, customers=customers)
+    def __init__(
+        self,
+        orders,
+        pickers,
+        amrs,
+        coord_map,
+        layout,
+        staging=(0, 0),
+        dist_map=None,
+        customers=None,
+    ):
+        super().__init__(
+            orders,
+            pickers,
+            amrs,
+            coord_map,
+            staging=staging,
+            dist_map=dist_map,
+            customers=customers,
+        )
         self.layout = layout
+
     # NOTE: would move this into initiate so you always know on run that it exists rather than checking everytime
     def ensure_zone_state(self):
         if hasattr(self, "zone_grid"):
@@ -23,7 +50,8 @@ class ShuttleSim(models.Simulation):
         self.handoff_points = self.build_handoff_points()
         self.zone_pending = {z: [] for z in range(self.num_zones)}
         self.picker_busy_time = {p.id: 0.0 for p in self.pickers}
-    # NOTE: may want to move this into models because the other zone policies also use it 
+
+    # NOTE: may want to move this into models because the other zone policies also use it
     def build_zone_grid(self):
         rows = len(self.layout)
         cols = len(self.layout[0])
@@ -48,7 +76,7 @@ class ShuttleSim(models.Simulation):
 
         return zone
 
-    # NOTE: may want to move this into models because the other zone policies also use it 
+    # NOTE: may want to move this into models because the other zone policies also use it
     def build_handoff_points(self):
         zone_cells = defaultdict(list)
         for r in range(len(self.zone_grid)):
@@ -70,7 +98,7 @@ class ShuttleSim(models.Simulation):
     # Assignes a zone to an order based on which zone contains the majority of its items
     def zone_for_order(self, order):
         counts = {}
-        for (r, c) in order.coords:
+        for r, c in order.coords:
             zone_id = self.zone_grid[r][c]
             counts[zone_id] = counts.get(zone_id, 0) + 1
         return max(counts, key=lambda z: counts[z])
@@ -85,14 +113,18 @@ class ShuttleSim(models.Simulation):
             self.schedule(self.time, "BATCH_DISPATCH", {"zone": zone})
         elif len(queue) == 1:
             self.schedule(
-                self.time + params.BATCH_TIMEOUT, "BATCH_DISPATCH", {"zone": zone, "timeout": True}
+                self.time + params.BATCH_TIMEOUT,
+                "BATCH_DISPATCH",
+                {"zone": zone, "timeout": True},
             )
 
     def handle_end_flush(self):
         self.ensure_zone_state()
         for zone in range(self.num_zones):
             if self.zone_pending[zone]:
-                self.schedule(self.time, "BATCH_DISPATCH", {"zone": zone, "final": True})
+                self.schedule(
+                    self.time, "BATCH_DISPATCH", {"zone": zone, "final": True}
+                )
 
     def create_batch(self, zone, picker, amr, force=False):
         queue = self.zone_pending[zone]
@@ -150,7 +182,8 @@ class ShuttleSim(models.Simulation):
         final = isinstance(payload, dict) and payload.get("final", False)
         queue = self.zone_pending[zone]
         timeout = (
-            isinstance(payload, dict) and payload.get("timeout", False)
+            isinstance(payload, dict)
+            and payload.get("timeout", False)
             and queue
             and self.time - queue[0].arrival_time >= params.BATCH_TIMEOUT
         )
@@ -163,15 +196,19 @@ class ShuttleSim(models.Simulation):
         amr = self.select_amr()
 
         # Reschedule if the chosen (least loaded) picker or AMR isn't free yet.
-        if picker.available_time > self.time or (amr is not None and amr.available_time > self.time):
+        if picker.available_time > self.time or (
+            amr is not None and amr.available_time > self.time
+        ):
             amr_time = amr.available_time if amr else 0
-            self.schedule(max(picker.available_time, amr_time), "BATCH_DISPATCH", payload)
+            self.schedule(
+                max(picker.available_time, amr_time), "BATCH_DISPATCH", payload
+            )
             return
 
         batch = self.create_batch(zone, picker, amr, force=force)
         if batch is None:
             return
-        self.metrics.batch_completion_count +=1
+        self.metrics.batch_completion_count += 1
         dispatch_time = self.time
         picker.mark_busy(self.time)
         if amr:
@@ -179,10 +216,14 @@ class ShuttleSim(models.Simulation):
 
         meeting_point = self.handoff_points[zone]
 
-        picker_to_start_dist = path_distance([picker.location, meeting_point], self.dist_map)
+        picker_to_start_dist = path_distance(
+            [picker.location, meeting_point], self.dist_map
+        )
         amr_to_start_dist = 0.0
         if amr:
-            amr_to_start_dist = path_distance([self.staging, meeting_point], self.dist_map)
+            amr_to_start_dist = path_distance(
+                [self.staging, meeting_point], self.dist_map
+            )
 
         picker_arrival = self.time + (picker_to_start_dist / params.WALKING_SPEED)
         amr_arrival = self.time
@@ -237,7 +278,9 @@ class ShuttleSim(models.Simulation):
                 continue
             if amr:
                 pick_duration = len(orders_at_node) * params.AMR_LOAD_TIME
-                pick_duration += self.customer_collisions(node, time_cursor, time_cursor + pick_duration)
+                pick_duration += self.customer_collisions(
+                    node, time_cursor, time_cursor + pick_duration
+                )
             else:
                 pick_duration = len(orders_at_node) * params.HUMAN_PICK_TIME
             if pick_duration > 0:
@@ -249,30 +292,45 @@ class ShuttleSim(models.Simulation):
             for order in seen_orders.values():
                 if order.pick_start_time is None:
                     order.pick_start_time = time_cursor - pick_duration
-                if (order.is_perishable and order.perishable_picked_at is None
-                        and node in order.perishable_coords):
+                if (
+                    order.is_perishable
+                    and order.perishable_picked_at is None
+                    and node in order.perishable_coords
+                ):
                     order.perishable_picked_at = time_cursor - pick_duration
                 decrement = sum(1 for coord in order.coords if coord == node)
                 order.items_remaining -= decrement
 
             if amr:
                 items_carried += sum(
-                    1 for order in orders_at_node for coord in order.coords if coord == node
+                    1
+                    for order in orders_at_node
+                    for coord in order.coords
+                    if coord == node
                 )
                 last_amr_node = node
 
                 if items_carried >= params.AMR_CAPACITY:
                     # Full AMR heads back to staging to unload; doesn't block the picker
-                    return_dist, return_time, unload_time = self.amr_return_leg(node, items_carried)
+                    return_dist, return_time, unload_time = self.amr_return_leg(
+                        node, items_carried
+                    )
                     active_amr.available_time = time_cursor + return_time + unload_time
                     active_amr.mark_idle(active_amr.available_time)
                     self.metrics.amr_distance += return_dist
 
                     # AMR is replaced
                     candidates = [a for a in self.amrs if a is not active_amr]
-                    replacement = min(candidates, key=lambda a: a.available_time) if candidates else active_amr
+                    replacement = (
+                        min(candidates, key=lambda a: a.available_time)
+                        if candidates
+                        else active_amr
+                    )
                     swap_dist = path_distance([self.staging, node], self.dist_map)
-                    swap_wait = max(0.0, replacement.available_time - time_cursor) + swap_dist / params.AMR_SPEED
+                    swap_wait = (
+                        max(0.0, replacement.available_time - time_cursor)
+                        + swap_dist / params.AMR_SPEED
+                    )
                     time_cursor += swap_wait
                     self.metrics.human_wait_for_amr += swap_wait
                     self.metrics.human_idle += swap_wait
@@ -284,10 +342,12 @@ class ShuttleSim(models.Simulation):
                     items_carried = 0
 
         last_item_location = meeting_point
-        if (route):
+        if route:
             last_item_location = route[-1]
 
-        picker.location = last_item_location # Picker ends the order at the last item location
+        picker.location = (
+            last_item_location  # Picker ends the order at the last item location
+        )
         picker.available_time = time_cursor
         picker.mark_idle(time_cursor)
         self.picker_busy_time[picker.id] += time_cursor - dispatch_time
@@ -296,9 +356,11 @@ class ShuttleSim(models.Simulation):
         picker.distance_walked += total_human_distance
         self.metrics.human_distance += total_human_distance
 
-        if (amr):
+        if amr:
             # AMR (whichever is currently active after any hot-swaps) ends the order at staging
-            amr_return_dist, amr_return_time, unload_time = self.amr_return_leg(last_amr_node, items_carried)
+            amr_return_dist, amr_return_time, unload_time = self.amr_return_leg(
+                last_amr_node, items_carried
+            )
             active_amr.available_time = time_cursor + amr_return_time + unload_time
             active_amr.mark_idle(active_amr.available_time)
 
@@ -311,13 +373,15 @@ class ShuttleSim(models.Simulation):
 
 # Main experimentation space where testing occurs
 if __name__ == "__main__":
-    layout = setup_layout()  
+    layout = setup_layout()
     coord_map = map_of_coords(layout)
     dist_map = all_distance_maps(layout)  # Precompute distances for routing
     staging = coord_map["S"][0]
 
     # Precompute list of orders
-    raw_orders = generate_orders(coord_map, params.SIM_TIME, layout, params.order_arrival_rate)
+    raw_orders = generate_orders(
+        coord_map, params.SIM_TIME, layout, params.order_arrival_rate
+    )
     orders = [
         models.Order(
             id=raw_order["order_id"],
@@ -336,5 +400,14 @@ if __name__ == "__main__":
     amrs = [models.AMR(i, staging) for i in range(params.num_robots)]
     customers = [models.Customer(i, staging) for i in range(params.num_customers)]
 
-    sim = ShuttleSim(orders, pickers, amrs, coord_map, layout, staging=staging, dist_map=dist_map, customers=customers)
+    sim = ShuttleSim(
+        orders,
+        pickers,
+        amrs,
+        coord_map,
+        layout,
+        staging=staging,
+        dist_map=dist_map,
+        customers=customers,
+    )
     sim.run()

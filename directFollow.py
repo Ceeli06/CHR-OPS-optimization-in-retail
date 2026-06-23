@@ -91,7 +91,7 @@ class FollowSim(models.Simulation):
         picker.mark_busy(self.time)
         if amr:
             amr.mark_busy(self.time)
-        self.metrics.batch_completion_count +=1
+        self.metrics.batch_completion_count += 1
         route = self.build_route(batch.orders)
         travel_distance = path_distance(route, self.dist_map)
         human_travel_time = travel_distance / params.WALKING_SPEED
@@ -129,7 +129,9 @@ class FollowSim(models.Simulation):
                 continue
             if amr:
                 pick_duration = len(orders_at_node) * params.AMR_LOAD_TIME
-                pick_duration += self.customer_collisions(node, time_cursor, time_cursor + pick_duration)
+                pick_duration += self.customer_collisions(
+                    node, time_cursor, time_cursor + pick_duration
+                )
             else:
                 pick_duration = len(orders_at_node) * params.HUMAN_PICK_TIME
             if pick_duration > 0:
@@ -152,13 +154,18 @@ class FollowSim(models.Simulation):
 
             if amr:
                 items_carried += sum(
-                    1 for order in orders_at_node for coord in order.coords if coord == node
+                    1
+                    for order in orders_at_node
+                    for coord in order.coords
+                    if coord == node
                 )
                 last_amr_node = node
 
                 if items_carried >= params.AMR_CAPACITY:
                     # Full AMR heads back to staging to unload; doesn't block the picker
-                    return_dist, return_time, unload_time = self.amr_return_leg(node, items_carried)
+                    return_dist, return_time, unload_time = self.amr_return_leg(
+                        node, items_carried
+                    )
                     amr.available_time = time_cursor + return_time + unload_time
                     amr.mark_idle(amr.available_time)
                     self.metrics.amr_distance += return_dist
@@ -167,7 +174,10 @@ class FollowSim(models.Simulation):
                     candidates = [a for a in self.amrs]
                     replacement = min(candidates, key=lambda a: a.available_time)
                     swap_dist = path_distance([self.staging, node], self.dist_map)
-                    swap_wait = max(0.0, replacement.available_time - time_cursor) + swap_dist / params.AMR_SPEED
+                    swap_wait = (
+                        max(0.0, replacement.available_time - time_cursor)
+                        + swap_dist / params.AMR_SPEED
+                    )
                     time_cursor += swap_wait
                     self.metrics.human_wait_for_amr += swap_wait
                     self.metrics.human_idle += swap_wait
@@ -187,10 +197,8 @@ class FollowSim(models.Simulation):
 
         # order is not complete until entire batch is returned to staging
         for order in batch.orders:
-           if order.items_remaining == 0 and order.completion_time is None:
-                   order.completion_time = finish_time
-
-
+            if order.items_remaining == 0 and order.completion_time is None:
+                order.completion_time = finish_time
 
         # Update picker available time; whichever AMR is currently active still has to
         # travel back to staging and unload before it's free for its next dispatch
@@ -198,7 +206,9 @@ class FollowSim(models.Simulation):
         picker.available_time = finish_time
         pick_complete_time = finish_time
         if amr:
-            return_dist, return_time, unload_time = self.amr_return_leg(last_amr_node, items_carried)
+            return_dist, return_time, unload_time = self.amr_return_leg(
+                last_amr_node, items_carried
+            )
             amr.available_time = time_cursor + return_time + unload_time
             amr.mark_idle(amr.available_time)
             self.metrics.amr_distance += return_dist
@@ -237,5 +247,14 @@ if __name__ == "__main__":
     amrs = [models.AMR(i, staging) for i in range(params.num_robots)]
     customers = [models.Customer(i, staging) for i in range(params.num_customers)]
 
-    sim = FollowSim(orders, pickers, amrs, coord_map, staging=staging, dist_map=dist_map, customers=customers, layout=layout)
+    sim = FollowSim(
+        orders,
+        pickers,
+        amrs,
+        coord_map,
+        staging=staging,
+        dist_map=dist_map,
+        customers=customers,
+        layout=layout,
+    )
     sim.run()

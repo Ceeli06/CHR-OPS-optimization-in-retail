@@ -13,6 +13,7 @@ from tkinter import ttk, scrolledtext
 
 if sys.platform == "win32":
     import ctypes
+
     try:
         ctypes.windll.shcore.SetProcessDpiAwareness(1)
     except (AttributeError, OSError):
@@ -20,6 +21,7 @@ if sys.platform == "win32":
 
 import numpy as np
 import matplotlib
+
 matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -44,17 +46,26 @@ POLICIES = [
         "name": "Manual",
         "uses_amr": False,
         "build": lambda ctx: manual.ManualSim(
-            ctx.orders, ctx.pickers, ctx.amrs, ctx.coord_map,
-            staging=ctx.staging, dist_map=ctx.dist_map,
+            ctx.orders,
+            ctx.pickers,
+            ctx.amrs,
+            ctx.coord_map,
+            staging=ctx.staging,
+            dist_map=ctx.dist_map,
         ),
     },
     {
         "name": "Direct Follow",
         "uses_amr": True,
         "build": lambda ctx: directFollow.FollowSim(
-            ctx.orders, ctx.pickers, ctx.amrs, ctx.coord_map,
-            staging=ctx.staging, dist_map=ctx.dist_map,
-            customers=ctx.customers, layout=ctx.layout,
+            ctx.orders,
+            ctx.pickers,
+            ctx.amrs,
+            ctx.coord_map,
+            staging=ctx.staging,
+            dist_map=ctx.dist_map,
+            customers=ctx.customers,
+            layout=ctx.layout,
         ),
     },
     {
@@ -62,17 +73,28 @@ POLICIES = [
         "uses_amr": True,
         "patch_num_zones": True,
         "build": lambda ctx: shuttle2Staging.ShuttleSim(
-            ctx.orders, ctx.pickers, ctx.amrs, ctx.coord_map, ctx.layout,
-            staging=ctx.staging, dist_map=ctx.dist_map, customers=ctx.customers,
+            ctx.orders,
+            ctx.pickers,
+            ctx.amrs,
+            ctx.coord_map,
+            ctx.layout,
+            staging=ctx.staging,
+            dist_map=ctx.dist_map,
+            customers=ctx.customers,
         ),
     },
     {
         "name": "Deadline Aware",
         "uses_amr": True,
         "build": lambda ctx: deadlineAware.DeadlineSim(
-            ctx.orders, ctx.pickers, ctx.amrs, ctx.coord_map,
-            staging=ctx.staging, dist_map=ctx.dist_map,
-            layout=ctx.layout, customers=ctx.customers,
+            ctx.orders,
+            ctx.pickers,
+            ctx.amrs,
+            ctx.coord_map,
+            staging=ctx.staging,
+            dist_map=ctx.dist_map,
+            layout=ctx.layout,
+            customers=ctx.customers,
         ),
     },
     {
@@ -80,8 +102,14 @@ POLICIES = [
         "uses_amr": True,
         "needs_dist_map_patch": True,
         "build": lambda ctx: zoneFollow.ZoneFollow(
-            ctx.orders, ctx.pickers, ctx.amrs, ctx.coord_map, ctx.layout,
-            staging=ctx.staging, dist_map=ctx.dist_map, customers=ctx.customers,
+            ctx.orders,
+            ctx.pickers,
+            ctx.amrs,
+            ctx.coord_map,
+            ctx.layout,
+            staging=ctx.staging,
+            dist_map=ctx.dist_map,
+            customers=ctx.customers,
         ),
     },
     {
@@ -89,21 +117,31 @@ POLICIES = [
         "uses_amr": True,
         "needs_dist_map_patch": True,
         "build": lambda ctx: zoneWait.ZoneWait(
-            ctx.orders, ctx.pickers, ctx.amrs, ctx.coord_map, ctx.layout,
-            staging=ctx.staging, dist_map=ctx.dist_map,
+            ctx.orders,
+            ctx.pickers,
+            ctx.amrs,
+            ctx.coord_map,
+            ctx.layout,
+            staging=ctx.staging,
+            dist_map=ctx.dist_map,
         ),
     },
     {
         "name": "Zone Divided",
         "uses_amr": True,
         "build": lambda ctx: zoneDivided.ZoneDivided(
-            ctx.orders, ctx.pickers, ctx.amrs, ctx.coord_map, ctx.layout,
-            staging=ctx.staging, dist_map=ctx.dist_map,
+            ctx.orders,
+            ctx.pickers,
+            ctx.amrs,
+            ctx.coord_map,
+            ctx.layout,
+            staging=ctx.staging,
+            dist_map=ctx.dist_map,
         ),
     },
 ]
 
-# Route-building method names 
+# Route-building method names
 ROUTE_METHOD_CANDIDATES = ["build_zoning_route", "build_decoupled_route", "build_route"]
 
 PARAM_FIELDS = [
@@ -115,7 +153,10 @@ PARAM_FIELDS = [
 
 IDENTITY_TRANSFORM = (lambda x: x, lambda x: x)
 DISPLAY_TRANSFORMS = {
-    "order_arrival_rate": (lambda stored: stored * 3600, lambda displayed: displayed / 3600),
+    "order_arrival_rate": (
+        lambda stored: stored * 3600,
+        lambda displayed: displayed / 3600,
+    ),
 }
 
 METRIC_CHARTS = [
@@ -124,12 +165,18 @@ METRIC_CHARTS = [
     ("late_pct", "Late orders (%)", lambda m: m.late_pct),
     ("avg_picker_idle", "Avg picker idle (min)", lambda m: m.avg_picker_idle / 60),
     ("amr_util", "AMR utilization (%)", lambda m: m.amr_util),
-    ("avg_picker_distance", "Avg picker walk distance (m)", lambda m: m.avg_picker_distance),
+    (
+        "avg_picker_distance",
+        "Avg picker walk distance (m)",
+        lambda m: m.avg_picker_distance,
+    ),
 ]
 
 
 class RunContext:
-    def __init__(self, orders, pickers, amrs, customers, coord_map, layout, staging, dist_map):
+    def __init__(
+        self, orders, pickers, amrs, customers, coord_map, layout, staging, dist_map
+    ):
         self.orders = orders
         self.pickers = pickers
         self.amrs = amrs
@@ -159,7 +206,9 @@ def instrument_routes(sim):
 
 def build_run_context(layout, coord_map, dist_map, staging):
     random.seed(ORDER_SEED)
-    raw_orders = generate_orders(coord_map, params.SIM_TIME, layout, params.order_arrival_rate)
+    raw_orders = generate_orders(
+        coord_map, params.SIM_TIME, layout, params.order_arrival_rate
+    )
     orders = [
         models.Order(
             id=raw["order_id"],
@@ -173,7 +222,9 @@ def build_run_context(layout, coord_map, dist_map, staging):
     pickers = [models.Picker(i, staging) for i in range(params.num_pickers)]
     amrs = [models.AMR(i, staging) for i in range(params.num_robots)]
     customers = [models.Customer(i, staging) for i in range(params.num_customers)]
-    return RunContext(orders, pickers, amrs, customers, coord_map, layout, staging, dist_map)
+    return RunContext(
+        orders, pickers, amrs, customers, coord_map, layout, staging, dist_map
+    )
 
 
 def run_all_policies():
@@ -208,7 +259,12 @@ def run_all_policies():
             "uses_amr": policy["uses_amr"],
         }
 
-    return {"layout": layout, "coord_map": coord_map, "staging": staging, "policies": results}
+    return {
+        "layout": layout,
+        "coord_map": coord_map,
+        "staging": staging,
+        "policies": results,
+    }
 
 
 # Route label per policy
@@ -253,7 +309,9 @@ class SimDashboard(tk.Tk):
             ttk.Entry(field, textvariable=var, width=12).pack()
             self.param_vars[key] = var
 
-        self.run_button = ttk.Button(panel, text="Re-run All Sims", command=self.on_run_clicked)
+        self.run_button = ttk.Button(
+            panel, text="Re-run All Sims", command=self.on_run_clicked
+        )
         self.run_button.pack(side=tk.LEFT, padx=16)
 
         self.status_var = tk.StringVar()
@@ -276,7 +334,9 @@ class SimDashboard(tk.Tk):
 
     def _build_metrics_tab(self):
         self.metrics_fig, self.metrics_axes = plt.subplots(2, 3, figsize=(11, 6.5))
-        self.metrics_canvas = FigureCanvasTkAgg(self.metrics_fig, master=self.metrics_tab)
+        self.metrics_canvas = FigureCanvasTkAgg(
+            self.metrics_fig, master=self.metrics_tab
+        )
         self.metrics_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
         self._render_empty_metrics()
 
@@ -290,7 +350,9 @@ class SimDashboard(tk.Tk):
             controls, textvariable=self.route_policy_var, state="readonly", width=22
         )
         self.route_policy_combo.pack(side=tk.LEFT, padx=6)
-        self.route_policy_combo.bind("<<ComboboxSelected>>", lambda e: self._on_route_policy_change())
+        self.route_policy_combo.bind(
+            "<<ComboboxSelected>>", lambda e: self._on_route_policy_change()
+        )
 
         ttk.Label(controls, text="Batch:").pack(side=tk.LEFT, padx=(12, 0))
         self.route_batch_var = tk.StringVar()
@@ -298,7 +360,9 @@ class SimDashboard(tk.Tk):
             controls, textvariable=self.route_batch_var, state="readonly", width=16
         )
         self.route_batch_combo.pack(side=tk.LEFT, padx=6)
-        self.route_batch_combo.bind("<<ComboboxSelected>>", lambda e: self._render_route_tab())
+        self.route_batch_combo.bind(
+            "<<ComboboxSelected>>", lambda e: self._render_route_tab()
+        )
 
         self.route_fig, self.route_ax = plt.subplots(figsize=(11, 5.5))
         self.route_canvas = FigureCanvasTkAgg(self.route_fig, master=self.route_tab)
@@ -314,7 +378,9 @@ class SimDashboard(tk.Tk):
             controls, textvariable=self.log_policy_var, state="readonly", width=22
         )
         self.log_policy_combo.pack(side=tk.LEFT, padx=6)
-        self.log_policy_combo.bind("<<ComboboxSelected>>", lambda e: self._render_log_tab())
+        self.log_policy_combo.bind(
+            "<<ComboboxSelected>>", lambda e: self._render_log_tab()
+        )
 
         self.log_text = scrolledtext.ScrolledText(self.log_tab, wrap=tk.WORD)
         self.log_text.pack(fill=tk.BOTH, expand=True)
@@ -406,7 +472,10 @@ class SimDashboard(tk.Tk):
         for ax, (key, title, extractor) in zip(self.metrics_axes.flat, METRIC_CHARTS):
             ax.clear()
             values = [extractor(data["metrics"]) for data in policies.values()]
-            colors = ["#4c72b0" if data["uses_amr"] else "#999999" for data in policies.values()]
+            colors = [
+                "#4c72b0" if data["uses_amr"] else "#999999"
+                for data in policies.values()
+            ]
             ax.bar(short_names, values, color=colors)
             ax.set_title(title, fontsize=9)
             ax.tick_params(axis="x", labelsize=7)
@@ -453,7 +522,9 @@ class SimDashboard(tk.Tk):
         routes = data["routes"]
         if selection.startswith("Batch") and routes:
             batch_idx = int(selection.split(" ")[1])
-            self._draw_routes(ax, [routes[batch_idx]], staging, alpha=0.9, linewidth=2.0)
+            self._draw_routes(
+                ax, [routes[batch_idx]], staging, alpha=0.9, linewidth=2.0
+            )
         else:
             self._draw_routes(ax, routes, staging, alpha=0.15, linewidth=1.2)
 
@@ -464,22 +535,39 @@ class SimDashboard(tk.Tk):
         rows, cols = layout.shape
         ax.set_xlim(-1, cols)
         ax.set_ylim(rows, -1)
-        ax.set_title(f"{policy_name} — {ROUTE_LABELS.get(policy_name, 'Route')}", fontsize=10)
+        ax.set_title(
+            f"{policy_name} — {ROUTE_LABELS.get(policy_name, 'Route')}", fontsize=10
+        )
         self.route_fig.tight_layout()
         self.route_canvas.draw()
 
     def _draw_layout_background(self, ax, layout, zone_map):
         rows, cols = layout.shape
-        walkable = [[0 if layout[r, c] == "." else 1 for c in range(cols)] for r in range(rows)]
-        ax.imshow(walkable, cmap="Greys", aspect="auto", interpolation="nearest", alpha=0.3)
+        walkable = [
+            [0 if layout[r, c] == "." else 1 for c in range(cols)] for r in range(rows)
+        ]
+        ax.imshow(
+            walkable, cmap="Greys", aspect="auto", interpolation="nearest", alpha=0.3
+        )
 
         if zone_map is not None:
             grid = np.array(
-                [[(np.nan if (zone_map[r][c] is None or layout[r, c] != ".") else zone_map[r][c])
-                  for c in range(cols)] for r in range(rows)],
+                [
+                    [
+                        (
+                            np.nan
+                            if (zone_map[r][c] is None or layout[r, c] != ".")
+                            else zone_map[r][c]
+                        )
+                        for c in range(cols)
+                    ]
+                    for r in range(rows)
+                ],
                 dtype=float,
             )
-            ax.imshow(grid, cmap="Pastel1", aspect="auto", interpolation="nearest", alpha=0.6)
+            ax.imshow(
+                grid, cmap="Pastel1", aspect="auto", interpolation="nearest", alpha=0.6
+            )
 
     def _draw_routes(self, ax, routes, staging, alpha, linewidth):
         pick_counts = Counter()
@@ -506,15 +594,34 @@ class SimDashboard(tk.Tk):
         rows = [r for r, _c in pick_counts]
         cols = [c for _r, c in pick_counts]
         sizes = [18 + 14 * count for count in pick_counts.values()]
-        ax.scatter(cols, rows, s=sizes, color="#1b1b1b", alpha=0.85,
-                   edgecolors="white", linewidths=0.5, zorder=6)
+        ax.scatter(
+            cols,
+            rows,
+            s=sizes,
+            color="#1b1b1b",
+            alpha=0.85,
+            edgecolors="white",
+            linewidths=0.5,
+            zorder=6,
+        )
 
     def _draw_zone_hop_path(self, ax, staging, handoff_points):
-        ordered = [staging] + [coord for _zone, coord in sorted(handoff_points.items())] + [staging]
+        ordered = (
+            [staging]
+            + [coord for _zone, coord in sorted(handoff_points.items())]
+            + [staging]
+        )
         cols = [c for _r, c in ordered]
         rows = [r for r, _c in ordered]
-        ax.plot(cols, rows, color="#2b8cbe", linestyle="--", linewidth=1.5, alpha=0.7,
-                 label="Approx. AMR path between zones")
+        ax.plot(
+            cols,
+            rows,
+            color="#2b8cbe",
+            linestyle="--",
+            linewidth=1.5,
+            alpha=0.7,
+            label="Approx. AMR path between zones",
+        )
         ax.scatter(cols, rows, color="#2b8cbe", s=25, zorder=5)
         ax.legend(loc="upper right", fontsize=7)
 

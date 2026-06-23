@@ -1,4 +1,4 @@
-# Zone-divided policy DES where pickers stay permanently assigned to one zone each and batches 
+# Zone-divided policy DES where pickers stay permanently assigned to one zone each and batches
 # are split across zones similar to in zone-based wait-based, but each zone's items are carried
 # to staging by an individual AMR instead of one AMR visiting every zone in sequence. AMRs act like a
 # shared pool and can only be assigned to one zone at a time, so a picker in a zone may have to wait
@@ -17,12 +17,20 @@ from setup_layout import (
 from collections import defaultdict
 import math
 
+
 class ZoneDivided(models.Simulation):
     def __init__(
         self, orders, pickers, amrs, coord_map, layout, staging=(0, 0), dist_map=None
     ):
         super().__init__(
-            orders, pickers, amrs, coord_map, layout, zoneFollow=False, staging=staging, dist_map=dist_map
+            orders,
+            pickers,
+            amrs,
+            coord_map,
+            layout,
+            zoneFollow=False,
+            staging=staging,
+            dist_map=dist_map,
         )
 
         self.zoneMap = self.coordinate_zoning(layout, coord_map)
@@ -108,7 +116,9 @@ class ZoneDivided(models.Simulation):
         amrId = None
         if amr:
             amrId = amr.id
-        return models.Batch(orders=batch_orders, zoned_orders=zoned_orders, amr_id=amrId)
+        return models.Batch(
+            orders=batch_orders, zoned_orders=zoned_orders, amr_id=amrId
+        )
 
     # Greedy order assignment, picking whichever amr becomes available earliest
     def select_amr(self):
@@ -126,7 +136,7 @@ class ZoneDivided(models.Simulation):
         route = get_path(unique_coords, self.dist_map, startEnd, self.map)
         if not route or route[-1] != startEnd:
             route.append(startEnd)
-        
+
         return route
 
     def build_zoning_route(self, zoned_orders):
@@ -134,7 +144,7 @@ class ZoneDivided(models.Simulation):
 
         for zone_id, coords in zoned_orders.items():
             route[zone_id] = self.build_route(coords, self.handoffPoints[zone_id])
-        
+
         return route
 
     # Main order handling function which routes a batch, computes pick times, and schedules its completion
@@ -163,16 +173,18 @@ class ZoneDivided(models.Simulation):
         batch = self.create_batch(self.pickers, None, force=force)
         if batch is None:
             return
-        
+
         if amr:
             amr.mark_busy(self.time)
 
         route = self.build_zoning_route(batch.zoned_orders)
-        self.metrics.batch_completion_count +=1
+        self.metrics.batch_completion_count += 1
 
-        human_travel_distance = sum(path_distance(zonePath, self.dist_map) for zonePath in route.values())
+        human_travel_distance = sum(
+            path_distance(zonePath, self.dist_map) for zonePath in route.values()
+        )
 
-        # sets up coordinate to order # (used later in metrics determination), 
+        # sets up coordinate to order # (used later in metrics determination),
         # and which zones each order has items in
         coord_orders = {}
         order_zones = defaultdict(set)
@@ -219,7 +231,9 @@ class ZoneDivided(models.Simulation):
                 if self.zoneFollow:
                     pick_duration = len(orders_at_node) * params.AMR_LOAD_TIME
                 else:
-                    pick_duration = len(orders_at_node) * (params.HUMAN_PICK_TIME + params.AMR_LOAD_TIME)  # accounts for moving items to AMR @ end
+                    pick_duration = len(orders_at_node) * (
+                        params.HUMAN_PICK_TIME + params.AMR_LOAD_TIME
+                    )  # accounts for moving items to AMR @ end
 
                 picker_time += pick_duration
 
@@ -297,7 +311,9 @@ class ZoneDivided(models.Simulation):
                         [self.handoffPoints[zone_id], self.staging], self.dist_map
                     )
                     unload_time = params.AMR_UNLOAD_TIME * trip_items
-                    delivery_time = loaded_time + back_dist / params.AMR_SPEED + unload_time
+                    delivery_time = (
+                        loaded_time + back_dist / params.AMR_SPEED + unload_time
+                    )
 
                     zone_amr.mark_idle(delivery_time)
                     zone_amr.available_time = delivery_time
@@ -326,7 +342,7 @@ class ZoneDivided(models.Simulation):
                     order.completion_time = max(zone_delivery_time[z] for z in zones)
 
         finish_time = max(zone_delivery_time.values(), default=self.time)
-        self.metrics.batch_completion_count+=1
+        self.metrics.batch_completion_count += 1
         self.schedule(finish_time, "PICK_COMPLETE", batch)
 
 

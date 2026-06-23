@@ -52,7 +52,9 @@ class AMR:
     id: int
     location: tuple
     available_time: float = 0.0
-    distance_traveled: float = 0.0 # Enables desynchronized routing for deadlineAware scenario
+    distance_traveled: float = (
+        0.0  # Enables desynchronized routing for deadlineAware scenario
+    )
     is_idle: bool = True
     idle_start: float = 0.0
     total_idle: float = 0.0
@@ -68,12 +70,15 @@ class AMR:
             self.is_idle = True
             self.idle_start = current_time
 
+
 @dataclass
 class Customer:
     id: int
-    location: tuple # current position of customer
-    visits: dict = None # arrival_time and departure_time of coords for the customer's current trip
-    available_time: float = 0.0 # when current order is finished
+    location: tuple  # current position of customer
+    visits: dict = (
+        None  # arrival_time and departure_time of coords for the customer's current trip
+    )
+    available_time: float = 0.0  # when current order is finished
 
 
 # A set of orders grouped together for one picker to handle (6-8 per cart for manual)
@@ -135,7 +140,8 @@ class Metrics:
 
         # AMR utilization (ignored for manual policy since AMR not used)
         amr_util = (
-            ((elapsed_time - ((self.amr_idle) / params.num_robots)) / elapsed_time) * 100
+            ((elapsed_time - ((self.amr_idle) / params.num_robots)) / elapsed_time)
+            * 100
             if elapsed_time > 0 and params.num_robots
             else 0.0
         )
@@ -152,9 +158,15 @@ class Metrics:
             else 0.0
         )
 
-        avg_picker_distance = self.human_distance / params.num_pickers if params.num_pickers else 0.0
-        avg_picker_idle = self.human_idle / params.num_pickers if params.num_pickers else 0.0
-        avg_amr_wait_for_human = self.amr_wait_for_human / params.num_robots if params.num_robots else 0.0
+        avg_picker_distance = (
+            self.human_distance / params.num_pickers if params.num_pickers else 0.0
+        )
+        avg_picker_idle = (
+            self.human_idle / params.num_pickers if params.num_pickers else 0.0
+        )
+        avg_amr_wait_for_human = (
+            self.amr_wait_for_human / params.num_robots if params.num_robots else 0.0
+        )
         avg_amr_idle = self.amr_idle / params.num_robots if params.num_robots else 0.0
 
         # Stored on self so callers (e.g. simDashboard.py) can read the derived
@@ -186,14 +198,25 @@ class Metrics:
         print(f"Avg perishable exposure time: {avg_exposure/60:.2f} min")
         print(f"Spoiled perishables: {spoiled_pct:.2f}%")
         print(f"Throughput: {throughput:.2f} orders/hour")
-        #print(f"AMR hot swaps: {self.amr_hot_swaps}")
+        # print(f"AMR hot swaps: {self.amr_hot_swaps}")
         print(f"Batch count: {self.batch_completion_count:.2f} batches")
 
 
 # Parent simulation class that policy-specific simulations inherit from
 @dataclass
 class Simulation:
-    def __init__(self, orders, pickers, amrs, coord_map, layout=None, zoneFollow=False, staging=(0, 0), dist_map=None, customers=None):
+    def __init__(
+        self,
+        orders,
+        pickers,
+        amrs,
+        coord_map,
+        layout=None,
+        zoneFollow=False,
+        staging=(0, 0),
+        dist_map=None,
+        customers=None,
+    ):
         self.time = 0.0
         self.event_queue = (
             []
@@ -207,7 +230,6 @@ class Simulation:
         self.amrs = amrs  # Unused in manual policy
         self.customers = customers or []
 
-
         self.staging = staging
         self.dist_map = dist_map
         self.layout = layout
@@ -218,7 +240,7 @@ class Simulation:
         # Sets up event queue for scheduling order events
         for order in self.orders:
             self.schedule(order.arrival_time, "ORDER_ARRIVAL", order)
-        
+
         # Schedules customer arrivals and initial orders
         for customer in self.customers:
             self.schedule(0.0, "CUSTOMER_SHOPPING_COMPLETE", customer)
@@ -257,7 +279,9 @@ class Simulation:
                 self.handle_end_flush()
 
         # Sum total idle times and output final metrics
-        end_time = self.time  # actual final processed time, may exceed actual SIM_TIME due to flushed events
+        end_time = (
+            self.time
+        )  # actual final processed time, may exceed actual SIM_TIME due to flushed events
         for p in self.pickers:
             p.mark_busy(end_time)  # flush trailing idle into total_idle
         for r in self.amrs:
@@ -321,8 +345,10 @@ class Simulation:
             if not visit:
                 continue
             cust_arrival, cust_departure = visit
-            if (arrival_time - params.CUSTOMER_COLLISION_BUFFER <= cust_departure
-                    and cust_arrival <= departure_time + params.CUSTOMER_COLLISION_BUFFER):
+            if (
+                arrival_time - params.CUSTOMER_COLLISION_BUFFER <= cust_departure
+                and cust_arrival <= departure_time + params.CUSTOMER_COLLISION_BUFFER
+            ):
                 pause += params.CUSTOMER_COLLISION_TIME
         return pause
 
