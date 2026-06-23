@@ -200,7 +200,7 @@ class ZoneFollow(models.Simulation):
         prev_amr_coord = self.staging
         amr_wait_for_human = 0
         human_wait_for_amr = 0
-        amr_finished_picking_prev_zone_time = amr.available_time
+        amr_finished_picking_prev_zone_time = max(amr.available_time, self.time)
         items_carried = 0
 
         for zone_id in sorted(route.keys(), reverse=True):
