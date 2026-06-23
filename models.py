@@ -105,7 +105,8 @@ class Metrics:
         self.total_perishables = 0
         self.human_wait_for_amr = 0.0
         self.amr_wait_for_human = 0.0
-        self.amr_hot_swaps = 0
+        self.amr_swap_count = 0
+        self.batch_completion_count = 0
 
     # Record a completed order's comp.time and check if it missed the due time
     def record_completion(self, order: Order):
@@ -186,6 +187,7 @@ class Metrics:
         print(f"Spoiled perishables: {spoiled_pct:.2f}%")
         print(f"Throughput: {throughput:.2f} orders/hour")
         #print(f"AMR hot swaps: {self.amr_hot_swaps}")
+        print(f"Batch count: {self.batch_completion_count:.2f} batches")
 
 
 # Parent simulation class that policy-specific simulations inherit from
@@ -211,11 +213,8 @@ class Simulation:
         self.layout = layout
         self.metrics = Metrics()
         self.map = coord_map
-<<<<<<< HEAD
         self.batchCount = 0
-=======
         self.zoneFollow = zoneFollow
->>>>>>> visualizationDev
 
         # Sets up event queue for scheduling order events
         for order in self.orders:
