@@ -245,6 +245,7 @@ class ZoneFollow(models.Simulation):
                     pick_duration += self.customer_collisions(node, picker_time, picker_time + pick_duration)
                 else:
                     pick_duration = len(orders_at_node) * (params.HUMAN_PICK_TIME + params.AMR_LOAD_TIME) # accounts for moving items to AMR @ end
+                    pick_duration += self.customer_collisions(node, picker_time, picker_time + pick_duration)
 
                 picker_time += pick_duration
 
