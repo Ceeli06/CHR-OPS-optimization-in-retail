@@ -160,6 +160,13 @@ class DeadlineSim(models.Simulation):
         self.metrics.human_wait_for_amr += human_wait
         self.metrics.human_idle += human_wait
 
+        # Calculate AMR wait time if it beat the human to the zone
+        amr_wait = max(0.0, picker_arrival - amr_arrival)
+        if amr and amr_wait > 0:
+            self.metrics.amr_wait_for_human += amr_wait
+            amr.mark_idle(amr_arrival)
+            amr.mark_busy(sync_start_time)
+
         # Building decoupled routes
         route = self.build_decoupled_route(batch.orders, meeting_point)
         picking_distance = path_distance(route, self.dist_map)
@@ -186,6 +193,10 @@ class DeadlineSim(models.Simulation):
             for coord in order.coords:
                 coord_orders.setdefault(coord, []).append(order)
 
+        active_amr = amr
+        items_carried = 0
+        last_amr_node = meeting_point
+
         # Walk the route, picking items and updating order state at each stop
         for node in route:
             if node == self.staging:
@@ -195,7 +206,8 @@ class DeadlineSim(models.Simulation):
                 continue
             if (amr):
                 pick_duration = len(orders_at_node) * params.AMR_LOAD_TIME
-            else: 
+                pick_duration += self.customer_collisions(node, time_cursor, time_cursor + pick_duration)
+            else:
                 pick_duration = len(orders_at_node) * params.HUMAN_PICK_TIME
             if pick_duration > 0:
                 time_cursor += pick_duration # Update batch time every pick
@@ -210,7 +222,35 @@ class DeadlineSim(models.Simulation):
                         and node in order.perishable_coords):
                     order.perishable_picked_at = time_cursor - pick_duration
                 decrement = sum(1 for coord in order.coords if coord == node)
-                order.items_remaining -= decrement 
+                order.items_remaining -= decrement
+
+            if amr:
+                items_carried += sum(
+                    1 for order in orders_at_node for coord in order.coords if coord == node
+                )
+                last_amr_node = node
+
+                if items_carried >= params.AMR_CAPACITY:
+                    # Full AMR heads back to staging to unload (doesn't block the picker)
+                    return_dist, return_time, unload_time = self.amr_return_leg(node, items_carried)
+                    active_amr.available_time = time_cursor + return_time + unload_time
+                    active_amr.mark_idle(active_amr.available_time)
+                    self.metrics.amr_distance += return_dist
+
+                    # AMR is replaced
+                    candidates = [a for a in self.amrs if a is not active_amr]
+                    replacement = min(candidates, key=lambda a: a.available_time) if candidates else active_amr
+                    swap_dist = path_distance([self.staging, node], self.dist_map)
+                    swap_wait = max(0.0, replacement.available_time - time_cursor) + swap_dist / params.AMR_SPEED
+                    time_cursor += swap_wait
+                    self.metrics.human_wait_for_amr += swap_wait
+                    self.metrics.human_idle += swap_wait
+                    self.metrics.amr_distance += swap_dist
+                    self.metrics.amr_hot_swaps += 1
+
+                    replacement.mark_busy(time_cursor)
+                    active_amr = replacement
+                    items_carried = 0
 
         last_item_location = self.staging
         if (route):
@@ -225,14 +265,14 @@ class DeadlineSim(models.Simulation):
         self.metrics.human_distance += total_human_distance
         self.batchCount +=1
         if (amr):
-            # AMR ends the order at the staging location (drops items off dysynchronized from picker)
-            amr_return_dist = path_distance([last_item_location, self.staging], self.dist_map)
-            amr_return_time = amr_return_dist / params.AMR_SPEED
-            amr.available_time = time_cursor + amr_return_time
+            # AMR (whichever is currently active after any hot-swaps) ends the order at staging
+            amr_return_dist, amr_return_time, unload_time = self.amr_return_leg(last_amr_node, items_carried)
+            active_amr.available_time = time_cursor + amr_return_time + unload_time
+            active_amr.mark_idle(active_amr.available_time)
 
             total_amr_distance = amr_to_start_dist + picking_distance + amr_return_dist
             self.metrics.amr_distance += total_amr_distance
-            self.schedule(time_cursor + amr_return_time, "PICK_COMPLETE", batch)
+            self.schedule(active_amr.available_time, "PICK_COMPLETE", batch)
         else:
             self.schedule(time_cursor, "PICK_COMPLETE", batch)
 
@@ -244,7 +284,7 @@ if __name__ == "__main__":
     staging = coord_map["S"][0]
 
     # Precompute list of orders
-    raw_orders = generate_orders(coord_map, params.SIM_TIME, layout, params.ORDER_ARRIVAL_RATE)
+    raw_orders = generate_orders(coord_map, params.SIM_TIME, layout, params.order_arrival_rate)
     orders = [
        models.Order(
             id=raw_order["order_id"],
@@ -262,6 +302,7 @@ if __name__ == "__main__":
 
     pickers = [models.Picker(i, staging) for i in range(params.num_pickers)]
     amrs = [models.AMR(i, staging) for i in range(params.num_robots)]
+    customers = [models.Customer(i, staging) for i in range(params.num_customers)]
 
-    sim = DeadlineSim(orders, pickers, amrs, coord_map, staging=staging, dist_map=dist_map)
+    sim = DeadlineSim(orders, pickers, amrs, coord_map, staging=staging, dist_map=dist_map, layout=layout, customers=customers)
     sim.run()

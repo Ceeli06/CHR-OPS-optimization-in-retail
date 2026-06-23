@@ -1,5 +1,5 @@
 import params
-import models2
+import models
 from orderGen import generate_orders, convert_to_walkable
 from setup_layout import (
     setup_layout,
@@ -13,7 +13,7 @@ import math
 
 
 # Main DES simulation, where time advances only when events occur (arrivals, dispatches, completions)
-class ZoneWait(models2.Simulation):
+class ZoneWait(models.Simulation):
     def __init__(
         self, orders, pickers, amrs, coord_map, layout, staging=(0, 0), dist_map=None
     ):
@@ -44,7 +44,7 @@ class ZoneWait(models2.Simulation):
             zone[r][c] = 0
 
         # splits remaining space by x-coordinate
-        zone_width = cols / numPickers
+        zone_width = cols / numPickers if numPickers else cols
 
         for r in range(rows):
             for c in range(cols):
@@ -106,7 +106,7 @@ class ZoneWait(models2.Simulation):
         amrId = None
         if amr:
             amrId = amr.id
-        return models2.Batch(orders=batch_orders, zoned_orders = zoned_orders, amr_id=amrId)
+        return models.Batch(orders=batch_orders, zoned_orders = zoned_orders, amr_id=amrId)
 
     # Greedy order assignment, picking whichever picker becomes available earliest
 
@@ -138,7 +138,7 @@ class ZoneWait(models2.Simulation):
         return route
     
     # Main order handling function which routes a batch, computes pick times, and schedules its completion
-    def handle_batch(self, payload, zoneFollow):
+    def handle_batch(self, payload):
         final = isinstance(payload, dict) and payload.get("final", False)
 
         timeout = (
@@ -218,7 +218,7 @@ class ZoneWait(models2.Simulation):
                 if not orders_at_node:
                     continue
 
-                if zoneFollow:
+                if self.zoneFollow:
                     pick_duration = len(orders_at_node) * params.AMR_LOAD_TIME
                 else:
                     pick_duration = len(orders_at_node) * (params.HUMAN_PICK_TIME + params.AMR_LOAD_TIME) # accounts for moving items to AMR @ end
@@ -251,31 +251,57 @@ class ZoneWait(models2.Simulation):
         amr_wait_time = 0
         human_wait_time = 0
 
-        if amr and route and not zoneFollow:
+        if amr and route and not self.zoneFollow:
             #amr visits the furthest zone first then comes back to the zone containing perishables last
             zone_ids = sorted(route.keys(), reverse=True)
             amr_time = self.time
-
-            # staging -> first zone
-            first_zone = zone_ids[0]
-
-            travel_dist = path_distance(
-                [self.staging, self.handoffPoints[first_zone]],
-                self.dist_map
-            )
-
-            amr_time += travel_dist / params.AMR_SPEED
+            active_amr = amr
+            items_carried = 0
+            current_amr_node = self.staging
 
             # visit zones sequentially
             for idx, zone_id in enumerate(zone_ids):
+                zone_items = len(batch.zoned_orders[zone_id])
+
+                # If this zone's items would overflow the active AMR's remaining
+                # capacity, swap to a replacement before traveling to this zone
+                if items_carried > 0 and items_carried + zone_items > params.AMR_CAPACITY:
+                    return_dist, return_time, unload_time = self.amr_return_leg(current_amr_node, items_carried)
+                    active_amr.available_time = amr_time + return_time + unload_time
+                    active_amr.mark_idle(active_amr.available_time)
+                    self.metrics.amr_distance += return_dist
+
+                    candidates = [a for a in self.amrs if a is not active_amr]
+                    replacement = min(candidates, key=lambda a: a.available_time) if candidates else active_amr
+                    swap_dist = path_distance([self.staging, self.handoffPoints[zone_id]], self.dist_map)
+                    swap_wait = max(0.0, replacement.available_time - amr_time) + swap_dist / params.AMR_SPEED
+                    amr_time += swap_wait
+                    human_wait_time += swap_wait
+                    self.metrics.amr_distance += swap_dist
+                    self.metrics.amr_hot_swaps += 1
+
+                    replacement.mark_busy(amr_time)
+                    active_amr = replacement
+                    items_carried = 0
+                    current_amr_node = self.handoffPoints[zone_id]
+                else:
+                    travel_dist = path_distance(
+                        [current_amr_node, self.handoffPoints[zone_id]], self.dist_map
+                    )
+                    amr_time += travel_dist / params.AMR_SPEED
+                    self.metrics.amr_distance += travel_dist
+                    current_amr_node = self.handoffPoints[zone_id]
 
                 picker_finish = picker_finish_times[zone_id]
 
                 if amr_time < picker_finish:
                     # AMR arrived before picker finished
-                    wait = picker_finish - amr_time
+                    arrival_time = amr_time
+                    wait = picker_finish - arrival_time
                     amr_wait_time += wait
                     amr_time += wait
+                    active_amr.mark_idle(arrival_time)
+                    active_amr.mark_busy(amr_time)
 
                 else:
                     # Picker finished before AMR arrived
@@ -283,34 +309,16 @@ class ZoneWait(models2.Simulation):
 
                 # Handoff/loading time
                 amr_time += params.AMR_LOAD_TIME
+                items_carried += zone_items
 
-                # Travel to next zone
-                if idx < len(zone_ids) - 1:
-
-                    next_zone = zone_ids[idx + 1]
-
-                    travel_dist = path_distance(
-                        [
-                            self.handoffPoints[zone_id],
-                            self.handoffPoints[next_zone]
-                        ],
-                        self.dist_map
-                    )
-
-                    amr_time += travel_dist / params.AMR_SPEED
-
-            # Last zone -> staging
-            last_zone = zone_ids[-1]
-
-            travel_dist = path_distance(
-                [self.handoffPoints[last_zone], self.staging],
-                self.dist_map
-            )
-
-            amr_time += travel_dist / params.AMR_SPEED
+            # Last zone to staging
+            return_dist, return_time, unload_time = self.amr_return_leg(current_amr_node, items_carried)
+            amr_time += return_time + unload_time
+            self.metrics.amr_distance += return_dist
 
             amr_finish_time = amr_time
-            amr.available_time = amr_finish_time
+            active_amr.available_time = amr_finish_time
+            active_amr.mark_idle(amr_finish_time)
 
         else:
             # zone-follow mode or no AMR
@@ -345,10 +353,10 @@ if __name__ == "__main__":
 
     # Precompute list of orders
     raw_orders = generate_orders(
-        coord_map, params.SIM_TIME, layout, params.ORDER_ARRIVAL_RATE
+        coord_map, params.SIM_TIME, layout, params.order_arrival_rate
     )
     orders = [
-        models2.Order(
+        models.Order(
             id=raw_order["order_id"],
             arrival_time=raw_order["arrival_time"],
             items=raw_order["items"],
@@ -361,8 +369,8 @@ if __name__ == "__main__":
         for raw_order in raw_orders
     ]
 
-    pickers = [models2.Picker(i, staging) for i in range(params.num_pickers)]
-    amrs = [models2.AMR(i, staging) for i in range(params.num_robots)]
+    pickers = [models.Picker(i, staging) for i in range(params.num_pickers)]
+    amrs = [models.AMR(i, staging) for i in range(params.num_robots)]
 
     sim = ZoneWait(
         orders, pickers, amrs, coord_map, layout, staging=staging, dist_map=dist_map

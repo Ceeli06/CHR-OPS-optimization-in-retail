@@ -5,7 +5,7 @@
 # for an AMR to free up. An order isn't complete until every zone its items touched has reached staging.
 
 import params
-import models2
+import models
 from orderGen import generate_orders, convert_to_walkable
 from setup_layout import (
     setup_layout,
@@ -17,12 +17,12 @@ from setup_layout import (
 from collections import defaultdict
 import math
 
-class ZoneDivided(models2.Simulation):
+class ZoneDivided(models.Simulation):
     def __init__(
         self, orders, pickers, amrs, coord_map, layout, staging=(0, 0), dist_map=None
     ):
         super().__init__(
-            orders, pickers, amrs, coord_map, layout, False, staging=staging, dist_map=dist_map
+            orders, pickers, amrs, coord_map, layout, zoneFollow=False, staging=staging, dist_map=dist_map
         )
 
         self.zoneMap = self.coordinate_zoning(layout, coord_map)
@@ -47,7 +47,7 @@ class ZoneDivided(models2.Simulation):
             zone[r][c] = 0
 
         # splits remaining space by x-coordinate
-        zone_width = cols / numPickers
+        zone_width = cols / numPickers if numPickers else cols
 
         for r in range(rows):
             for c in range(cols):
@@ -108,7 +108,7 @@ class ZoneDivided(models2.Simulation):
         amrId = None
         if amr:
             amrId = amr.id
-        return models2.Batch(orders=batch_orders, zoned_orders=zoned_orders, amr_id=amrId)
+        return models.Batch(orders=batch_orders, zoned_orders=zoned_orders, amr_id=amrId)
 
     # Greedy order assignment, picking whichever amr becomes available earliest
     def select_amr(self):
@@ -138,7 +138,7 @@ class ZoneDivided(models2.Simulation):
         return route
 
     # Main order handling function which routes a batch, computes pick times, and schedules its completion
-    def handle_batch(self, payload, zoneFollow):
+    def handle_batch(self, payload):
         final = isinstance(payload, dict) and payload.get("final", False)
 
         timeout = (
@@ -159,7 +159,6 @@ class ZoneDivided(models2.Simulation):
         if amr and amr.available_time > self.time:
             self.schedule(amr.available_time, "BATCH_DISPATCH", payload)
             return
-        
 
         batch = self.create_batch(self.pickers, None, force=force)
         if batch is None:
@@ -169,7 +168,7 @@ class ZoneDivided(models2.Simulation):
             amr.mark_busy(self.time)
 
         route = self.build_zoning_route(batch.zoned_orders)
-        self.batchCount +=1
+        self.metrics.batch_completion_count +=1
 
         human_travel_distance = sum(path_distance(zonePath, self.dist_map) for zonePath in route.values())
 
@@ -217,7 +216,7 @@ class ZoneDivided(models2.Simulation):
                 if not orders_at_node:
                     continue
 
-                if zoneFollow:
+                if self.zoneFollow:
                     pick_duration = len(orders_at_node) * params.AMR_LOAD_TIME
                 else:
                     pick_duration = len(orders_at_node) * (params.HUMAN_PICK_TIME + params.AMR_LOAD_TIME)  # accounts for moving items to AMR @ end
@@ -260,39 +259,56 @@ class ZoneDivided(models2.Simulation):
 
             # Whichever zone's picker finishes first claims an AMR first
             for zone_id in sorted(route.keys(), key=lambda z: picker_finish_times[z]):
-                amr_id = min(tentative_available, key=tentative_available.get)
-                zone_amr = amr_by_id[amr_id]
-
-                departure = max(tentative_available[amr_id], self.time)
-                zone_amr.mark_busy(departure)
-
-                to_zone_dist = path_distance(
-                    [self.staging, self.handoffPoints[zone_id]], self.dist_map
-                )
-                arrival = departure + to_zone_dist / params.AMR_SPEED
-
                 picker_finish = picker_finish_times[zone_id]
-                if arrival < picker_finish:
-                    # AMR arrived before this zone's picker finished
-                    amr_wait_time += picker_finish - arrival
-                else:
-                    # Picker finished before the AMR arrived
-                    human_wait_time += arrival - picker_finish
+                zone_item_count = len(batch.zoned_orders[zone_id])
+                num_trips = max(1, math.ceil(zone_item_count / params.AMR_CAPACITY))
+                # Split items as evenly as possible across the trips needed to stay under capacity
+                base, extra = divmod(zone_item_count, num_trips)
+                trip_sizes = [base + (1 if i < extra else 0) for i in range(num_trips)]
 
-                pickup_time = max(arrival, picker_finish)
-                loaded_time = pickup_time + params.AMR_LOAD_TIME
+                last_delivery_time = picker_finish
+                for trip_idx, trip_items in enumerate(trip_sizes):
+                    amr_id = min(tentative_available, key=tentative_available.get)
+                    zone_amr = amr_by_id[amr_id]
 
-                back_dist = path_distance(
-                    [self.handoffPoints[zone_id], self.staging], self.dist_map
-                )
-                delivery_time = loaded_time + back_dist / params.AMR_SPEED
+                    departure = max(tentative_available[amr_id], self.time)
+                    zone_amr.mark_busy(departure)
 
-                zone_amr.mark_idle(delivery_time)
-                zone_amr.available_time = delivery_time
-                tentative_available[amr_id] = delivery_time
+                    to_zone_dist = path_distance(
+                        [self.staging, self.handoffPoints[zone_id]], self.dist_map
+                    )
+                    arrival = departure + to_zone_dist / params.AMR_SPEED
 
-                zone_delivery_time[zone_id] = delivery_time
-                amr_distance_total += to_zone_dist + back_dist
+                    # Only the first trip needs to wait on the picker (further trips just need
+                    # an AMR available, since the picker already dropped off all the items)
+                    ready_time = picker_finish if trip_idx == 0 else last_delivery_time
+
+                    if arrival < ready_time:
+                        amr_wait_time += ready_time - arrival
+                        zone_amr.mark_idle(arrival)
+                        zone_amr.mark_busy(ready_time)
+                    else:
+                        human_wait_time += arrival - ready_time
+
+                    pickup_time = max(arrival, ready_time)
+                    loaded_time = pickup_time + params.AMR_LOAD_TIME
+
+                    back_dist = path_distance(
+                        [self.handoffPoints[zone_id], self.staging], self.dist_map
+                    )
+                    unload_time = params.AMR_UNLOAD_TIME * trip_items
+                    delivery_time = loaded_time + back_dist / params.AMR_SPEED + unload_time
+
+                    zone_amr.mark_idle(delivery_time)
+                    zone_amr.available_time = delivery_time
+                    tentative_available[amr_id] = delivery_time
+
+                    last_delivery_time = delivery_time
+                    amr_distance_total += to_zone_dist + back_dist
+                    if num_trips > 1:
+                        self.metrics.amr_swap_count += 1
+
+                zone_delivery_time[zone_id] = last_delivery_time
         else:
             for zone_id in route.keys():
                 zone_delivery_time[zone_id] = picker_finish_times[zone_id]
@@ -324,10 +340,10 @@ if __name__ == "__main__":
 
     # Precompute list of orders
     raw_orders = generate_orders(
-        coord_map, params.SIM_TIME, layout, params.ORDER_ARRIVAL_RATE
+        coord_map, params.SIM_TIME, layout, params.order_arrival_rate
     )
     orders = [
-        models2.Order(
+        models.Order(
             id=raw_order["order_id"],
             arrival_time=raw_order["arrival_time"],
             items=raw_order["items"],
@@ -340,8 +356,8 @@ if __name__ == "__main__":
         for raw_order in raw_orders
     ]
 
-    pickers = [models2.Picker(i, staging) for i in range(params.num_pickers)]
-    amrs = [models2.AMR(i, staging) for i in range(params.num_robots)]
+    pickers = [models.Picker(i, staging) for i in range(params.num_pickers)]
+    amrs = [models.AMR(i, staging) for i in range(params.num_robots)]
 
     sim = ZoneDivided(
         orders, pickers, amrs, coord_map, layout, staging=staging, dist_map=dist_map

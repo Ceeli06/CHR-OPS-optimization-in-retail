@@ -1,6 +1,8 @@
 import params
 import heapq
 from dataclasses import dataclass
+from orderGen import generate_order_helper, generate_order_coords
+from setup_layout import path_distance
 
 
 # A customer order with items to be picked from the store
@@ -66,13 +68,21 @@ class AMR:
             self.is_idle = True
             self.idle_start = current_time
 
+@dataclass
+class Customer:
+    id: int
+    location: tuple # current position of customer
+    visits: dict = None # arrival_time and departure_time of coords for the customer's current trip
+    available_time: float = 0.0 # when current order is finished
+
 
 # A set of orders grouped together for one picker to handle (6-8 per cart for manual)
 @dataclass
 class Batch:
     orders: list
-    picker_id: int
-    amr_id: int
+    picker_id: int = None
+    amr_id: int = None
+    zoned_orders: dict = None
 
 
 # Utilities to collect and print key performance metrics at end of simulation
@@ -94,6 +104,8 @@ class Metrics:
         self.spoiled_perishables = 0
         self.total_perishables = 0
         self.human_wait_for_amr = 0.0
+        self.amr_wait_for_human = 0.0
+        self.amr_hot_swaps = 0
 
     # Record a completed order's comp.time and check if it missed the due time
     def record_completion(self, order: Order):
@@ -108,7 +120,8 @@ class Metrics:
         self.total_orders += 1
 
     # Compute and print all final metrics
-    def finalize(self, sim_time: float):
+    def finalize(self, sim_time: float, elapsed_time: float = None):
+        elapsed_time = elapsed_time if elapsed_time is not None else sim_time
         avg_completion = (
             sum(self.completion_times) / len(self.completion_times)
             if self.completion_times
@@ -121,11 +134,10 @@ class Metrics:
 
         # AMR utilization (ignored for manual policy since AMR not used)
         amr_util = (
-            ((sim_time - ((self.amr_idle) / params.num_robots)) / sim_time) * 100
-            if sim_time > 0
+            ((elapsed_time - ((self.amr_idle) / params.num_robots)) / elapsed_time) * 100
+            if elapsed_time > 0 and params.num_robots
             else 0.0
         )
-        # NOTE: above breaks down when there are just amrs idle (never utilized), will be negative..is this okay?
 
         avg_exposure = (
             sum(self.perishable_exposure) / len(self.perishable_exposure)
@@ -139,23 +151,47 @@ class Metrics:
             else 0.0
         )
 
+        avg_picker_distance = self.human_distance / params.num_pickers if params.num_pickers else 0.0
+        avg_picker_idle = self.human_idle / params.num_pickers if params.num_pickers else 0.0
+        avg_amr_wait_for_human = self.amr_wait_for_human / params.num_robots if params.num_robots else 0.0
+        avg_amr_idle = self.amr_idle / params.num_robots if params.num_robots else 0.0
+
+        # Stored on self so callers (e.g. simDashboard.py) can read the derived
+        # metrics without re-deriving these formulas themselves
+        self.avg_completion = avg_completion
+        self.late_pct = late_pct
+        self.throughput = throughput
+        self.amr_util = amr_util
+        self.avg_exposure = avg_exposure
+        self.spoiled_pct = spoiled_pct
+        self.avg_picker_distance = avg_picker_distance
+        self.avg_picker_idle = avg_picker_idle
+        self.avg_amr_wait_for_human = avg_amr_wait_for_human
+        self.avg_amr_idle = avg_amr_idle
+
         print("\n===== METRICS =====")
         print(f"Avg completion time: {avg_completion/60:.2f} min")
         print(f"Late orders: {late_pct:.2f}%")
         print(f"Total picker travel distance: {self.human_distance:.2f} meters")
+        print(f"Avg picker travel distance: {avg_picker_distance:.2f} meters")
         print(f"Total picker idle time: {self.human_idle/60:.2f} min")
+        print(f"Avg picker idle time: {avg_picker_idle/60:.2f} min")
         print(f"Human wait time for AMR: {self.human_wait_for_amr/60:.2f} min")
+        print(f"AMR wait time for human: {self.amr_wait_for_human/60:.2f} min")
+        print(f"Avg AMR wait time for human: {avg_amr_wait_for_human/60:.2f} min")
         print(f"Total AMR idle time: {self.amr_idle/60:.2f} min")
+        print(f"Avg AMR idle time: {avg_amr_idle/60:.2f} min")
         print(f"Average AMR utilization: {amr_util:.2f}%")
         print(f"Avg perishable exposure time: {avg_exposure/60:.2f} min")
         print(f"Spoiled perishables: {spoiled_pct:.2f}%")
         print(f"Throughput: {throughput:.2f} orders/hour")
+        #print(f"AMR hot swaps: {self.amr_hot_swaps}")
 
 
 # Parent simulation class that policy-specific simulations inherit from
 @dataclass
 class Simulation:
-    def __init__(self, orders, pickers, amrs, coord_map, staging=(0, 0), dist_map=None):
+    def __init__(self, orders, pickers, amrs, coord_map, layout=None, zoneFollow=False, staging=(0, 0), dist_map=None, customers=None):
         self.time = 0.0
         self.event_queue = (
             []
@@ -167,16 +203,27 @@ class Simulation:
 
         self.pickers = pickers
         self.amrs = amrs  # Unused in manual policy
+        self.customers = customers or []
+
 
         self.staging = staging
         self.dist_map = dist_map
+        self.layout = layout
         self.metrics = Metrics()
         self.map = coord_map
+<<<<<<< HEAD
         self.batchCount = 0
+=======
+        self.zoneFollow = zoneFollow
+>>>>>>> visualizationDev
 
         # Sets up event queue for scheduling order events
         for order in self.orders:
             self.schedule(order.arrival_time, "ORDER_ARRIVAL", order)
+        
+        # Schedules customer arrivals and initial orders
+        for customer in self.customers:
+            self.schedule(0.0, "CUSTOMER_SHOPPING_COMPLETE", customer)
 
         self.schedule(params.SIM_TIME, "SIM_END_FLUSH", None)
 
@@ -206,14 +253,21 @@ class Simulation:
                 self.handle_batch(payload)
             elif event_type == "PICK_COMPLETE":
                 self.handle_pick_complete(payload)
+            elif event_type == "CUSTOMER_SHOPPING_COMPLETE":
+                self.handle_customer_shopping(payload)
             elif event_type == "SIM_END_FLUSH":
                 self.handle_end_flush()
         print("batch count: ", self.batchCount)
 
         # Sum total idle times and output final metrics
+        end_time = self.time  # actual final processed time, may exceed actual SIM_TIME due to flushed events
+        for p in self.pickers:
+            p.mark_busy(end_time)  # flush trailing idle into total_idle
+        for r in self.amrs:
+            r.mark_busy(end_time)
         self.metrics.human_idle = sum(p.total_idle for p in self.pickers)
         self.metrics.amr_idle = sum(r.total_idle for r in self.amrs)
-        self.metrics.finalize(params.SIM_TIME)
+        self.metrics.finalize(params.SIM_TIME, end_time)
 
     # Add an arriving order to the queue of pending orders, dispatching a batch once enough have piled up
     # Sends order to be batched
@@ -230,6 +284,50 @@ class Simulation:
     def handle_end_flush(self):
         if self.pending_orders:
             self.schedule(self.time, "BATCH_DISPATCH", {"final": True})
+
+    # Customer generates a new random shopping order and walks it at CUSTOMER_SPEED, adding browse
+    # time at each stop, then immediately schedules another trip when done
+    def handle_customer_shopping(self, customer):
+        if self.dist_map is None or self.layout is None:
+            return
+
+        order = generate_order_helper()
+        coords = generate_order_coords(order["items"], self.map, self.layout)
+        if not coords:
+            self.schedule(self.time + 60.0, "CUSTOMER_SHOPPING_COMPLETE", customer)
+            return
+
+        visits = {}
+        time_cursor = self.time
+        prev_node = customer.location
+        for coord in coords:
+            travel_dist = self.dist_map[prev_node][coord[0], coord[1]]
+            time_cursor += travel_dist / params.CUSTOMER_SPEED
+            arrival = time_cursor
+            time_cursor += params.CUSTOMER_BROWSE_TIME
+            visits[coord] = (arrival, time_cursor)
+            prev_node = coord
+
+        customer.visits = visits
+        customer.location = coords[-1]
+        customer.available_time = time_cursor
+        self.schedule(customer.available_time, "CUSTOMER_SHOPPING_COMPLETE", customer)
+
+    # Checks whether an AMR occupying coord from arrival_time to departure_time overlaps (within
+    # CUSTOMER_COLLISION_BUFFER seconds of margin) any customer's visit window at that same coord
+    def customer_collisions(self, coord, arrival_time, departure_time):
+        pause = 0.0
+        for customer in self.customers:
+            if not customer.visits:
+                continue
+            visit = customer.visits.get(coord)
+            if not visit:
+                continue
+            cust_arrival, cust_departure = visit
+            if (arrival_time - params.CUSTOMER_COLLISION_BUFFER <= cust_departure
+                    and cust_arrival <= departure_time + params.CUSTOMER_COLLISION_BUFFER):
+                pause += params.CUSTOMER_COLLISION_TIME
+        return pause
 
     # Helper that returns a set of all department names in an order
     def department_set(self, order):
@@ -307,11 +405,19 @@ class Simulation:
                     perishable_coords.add(coord)
         return perishable_coords
 
+    # Distance,time, and unload time for an AMR returning to staging from from a node, carrying 'items_carried' items
+    def amr_return_leg(self, from_node, items_carried):
+        return_dist = path_distance([from_node, self.staging], self.dist_map)
+        return_time = return_dist / params.AMR_SPEED
+        unload_time = params.AMR_UNLOAD_TIME * items_carried
+        return return_dist, return_time, unload_time
+
     # Mark picker idle, record metrics for the completed batch, and schedule the next one if ready
     def handle_pick_complete(self, batch):
         # Update picker
-        picker = self.pickers[batch.picker_id]
-        picker.mark_idle(self.time)
+        if batch.picker_id is not None:
+            picker = self.pickers[batch.picker_id]
+            picker.mark_idle(self.time)
         if batch.amr_id is not None:
             amr = self.amrs[batch.amr_id]
             amr.mark_idle(self.time)
