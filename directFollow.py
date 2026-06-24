@@ -20,7 +20,7 @@ class FollowSim(models.Simulation):
             return None
 
         batch_size = min(len(self.pending_orders), params.BATCH_SIZE_MAX)
-        batch_orders, self.pending_orders = self.select_similar_batch(batch_size)
+        batch_orders, self.pending_orders = super().select_similar_batch(batch_size)
         amrId = None
         if amr:
             amrId = amr.id
@@ -67,7 +67,7 @@ class FollowSim(models.Simulation):
         if amr:
             amr.mark_busy(self.time)
         self.metrics.batch_completion_count += 1
-        route = super().build_route(batch.orders)
+        route = super().build_route_2(batch.orders)
         travel_distance = path_distance(route, self.dist_map)
         human_travel_time = travel_distance / params.WALKING_SPEED
         amr_travel_time = travel_distance / params.AMR_SPEED

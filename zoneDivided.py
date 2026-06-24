@@ -43,7 +43,7 @@ class ZoneDivided(models.Simulation):
             return None
 
         batch_size = min(len(self.pending_orders), params.BATCH_SIZE_MAX)
-        batch_orders, self.pending_orders = self.select_similar_batch(batch_size)
+        batch_orders, self.pending_orders = super().select_similar_batch(batch_size)
 
         zoned_orders = self.split_orders_into_zones(batch_orders, self.zoneMap)
 

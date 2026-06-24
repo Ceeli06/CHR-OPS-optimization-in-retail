@@ -341,7 +341,7 @@ class Simulation:
         return route
     
     # build_route for directFollow and manual
-    def build_route(self, orders):
+    def build_route_2(self, orders):
         coords = []
         for order in orders:
             coords.extend(order.coords)
@@ -473,9 +473,7 @@ class Simulation:
 
     # Gets Jaccard similarity of two order's department sets (0 = completely different, 1 = identical)
     def order_similarity(self, a, b):
-        print("a", a)
-        print("b", b)
-        depts_a = self.department_set(a)
+        depts_a = a
         depts_b = self.department_set(b)
         union = depts_a | depts_b
         if not union:
@@ -488,9 +486,9 @@ class Simulation:
     def select_similar_batch(self, batch_size):
         if batch_size >= len(self.pending_orders):
             return list(self.pending_orders), []
-
         selected_indices = {0}  # Seed = oldest order (index 0), always included
         seed = self.pending_orders[0]
+        
 
         # Force-include any order that has waited too long starting with oldest
         for i in range(1, len(self.pending_orders)):
@@ -500,12 +498,19 @@ class Simulation:
             if self.time - order.arrival_time >= params.SIMILARITY_BATCH_MAX_WAIT:
                 selected_indices.add(i)
 
+        total_intersection = self.department_set(seed)
+        for i in selected_indices:
+            dept_next = self.department_set(self.pending_orders[i])
+            total_intersection = total_intersection | dept_next
+        
         # Greedily fill remaining slots via. Jaccard with orders most similar to the first order (seed)
         remaining_indices = [
             i for i in range(1, len(self.pending_orders)) if i not in selected_indices
         ]
+        
+
         remaining_indices.sort(
-            key=lambda i: (-self.order_similarity(seed, self.pending_orders[i]), i)
+            key=lambda i: (-self.order_similarity(total_intersection, self.pending_orders[i]), i)
         )
 
         for i in remaining_indices:

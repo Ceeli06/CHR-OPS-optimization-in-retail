@@ -48,7 +48,7 @@ class ZoneFollow(models.Simulation):
             return None
 
         batch_size = min(len(self.pending_orders), params.BATCH_SIZE_MAX)
-        batch_orders, self.pending_orders = self.select_similar_batch(batch_size)
+        batch_orders, self.pending_orders = super().select_similar_batch(batch_size)
 
         zoned_orders = super().split_orders_into_zones(batch_orders, self.zoneMap)
 
@@ -235,7 +235,7 @@ class ZoneFollow(models.Simulation):
                 params.WALKING_SPEED, params.AMR_SPEED
             )
 
-            
+
             picker.available_time = picker_time
             picker_finish_times[zone_id] = picker_time
             amr_finished_picking_zone_time = picker_time

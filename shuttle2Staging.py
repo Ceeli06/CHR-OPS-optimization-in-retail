@@ -93,7 +93,7 @@ class ShuttleSim(models.Simulation):
         saved_pending = self.pending_orders
         self.pending_orders = queue
         try:
-            batch_orders, remaining = self.select_similar_batch(batch_size)
+            batch_orders, remaining = super().select_similar_batch(batch_size)
         finally:
             self.pending_orders = saved_pending
         self.zone_pending[zone] = remaining

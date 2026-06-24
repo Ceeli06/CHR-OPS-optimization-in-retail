@@ -25,7 +25,7 @@ class ManualSim(models.Simulation):
             return None
 
         batch_size = min(len(self.pending_orders), params.BATCH_SIZE_MAX)
-        batch_orders, self.pending_orders = self.select_similar_batch(batch_size)
+        batch_orders, self.pending_orders = super().select_similar_batch(batch_size)
 
         return models.Batch(orders=batch_orders, picker_id=picker.id, amr_id=None)
     
@@ -59,7 +59,7 @@ class ManualSim(models.Simulation):
 
         picker.mark_busy(self.time)
 
-        route = super().build_route(batch.orders)
+        route = super().build_route_2(batch.orders)
         travel_distance = path_distance(route, self.dist_map)
         travel_time = travel_distance / (
             params.WALKING_SPEED * params.MANUAL_PUSH_FACTOR
