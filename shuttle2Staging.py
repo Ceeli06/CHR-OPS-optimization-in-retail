@@ -46,7 +46,7 @@ class ShuttleSim(models.Simulation):
         if hasattr(self, "zone_grid"):
             return
         self.zone_grid = super().coordinate_zoning(self.layout, self.map)
-        self.handoff_points = super().get_zone_handoff_points(self.zone_grid, layout)
+        self.handoff_points = super().get_zone_handoff_points(self.zone_grid, self.layout)
         self.zone_pending = {z: [] for z in range(self.num_zones)}
         self.picker_busy_time = {p.id: 0.0 for p in self.pickers}
 
