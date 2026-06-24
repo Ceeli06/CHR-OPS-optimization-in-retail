@@ -26,7 +26,7 @@ class FollowSim(models.Simulation):
             amrId = amr.id
 
         batch = models.Batch(orders=batch_orders, picker_id=picker.id, amr_id=amrId)
-        return batch 
+        return batch
 
     # Main order handling function which routes a batch, computes pick times, and schedules its completion
     def handle_batch(self, payload):

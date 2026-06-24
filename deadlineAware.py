@@ -55,7 +55,10 @@ class DeadlineSim(models.Simulation):
             # If we still have slots, sort the remaining non_urgent orders by similarity and append
             if remaining_capacity > 0 and non_urgent_orders:
                 non_urgent_orders.sort(
-                    key=lambda o: (-self.order_similarity(seed_departments, o), o.due_time)
+                    key=lambda o: (
+                        -self.order_similarity(seed_departments, o),
+                        o.due_time,
+                    )
                 )
 
                 while non_urgent_orders and remaining_capacity > 0:
@@ -140,9 +143,7 @@ class DeadlineSim(models.Simulation):
         for order in batch.orders:
             all_coords.extend(order.coords)
         unique_coords = list(dict.fromkeys(all_coords))
-        meeting_point = (
-            self.staging
-        )  
+        meeting_point = self.staging
         # The meeting point of the picker and the AMR will be the first item
         # in the batch, which will be an item from the oldest order in the batch
         if unique_coords:

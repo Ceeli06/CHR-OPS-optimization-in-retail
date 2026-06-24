@@ -46,10 +46,11 @@ class ShuttleSim(models.Simulation):
         if hasattr(self, "zone_grid"):
             return
         self.zone_grid = super().coordinate_zoning(self.layout, self.map)
-        self.handoff_points = super().get_zone_handoff_points(self.zone_grid, self.layout)
+        self.handoff_points = super().get_zone_handoff_points(
+            self.zone_grid, self.layout
+        )
         self.zone_pending = {z: [] for z in range(self.num_zones)}
         self.picker_busy_time = {p.id: 0.0 for p in self.pickers}
-
 
     # Assignes a zone to an order based on which zone contains the majority of its items
     def zone_for_order(self, order):
@@ -108,7 +109,6 @@ class ShuttleSim(models.Simulation):
     def select_picker(self):
         self.ensure_zone_state()
         return min(self.pickers, key=lambda p: self.picker_busy_time[p.id])
-
 
     # Builds a decoupled route that is not synchronized with another resource (other AMR/Picker)
     def build_decoupled_route(self, orders, start_node):
@@ -338,6 +338,7 @@ if __name__ == "__main__":
         models.Order(
             id=raw_order["order_id"],
             arrival_time=raw_order["arrival_time"],
+            due_time=raw_order["arrival_time"] + params.ORDER_DUE_TIME,
             items=raw_order["items"],
             coords=raw_order["coords"],
             is_perishable=any(

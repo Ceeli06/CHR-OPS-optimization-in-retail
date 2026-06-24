@@ -270,6 +270,7 @@ if __name__ == "__main__":
         models.Order(
             id=raw_order["order_id"],
             arrival_time=raw_order["arrival_time"],
+            due_time=raw_order["arrival_time"] + params.ORDER_DUE_TIME,
             items=raw_order["items"],
             coords=raw_order["coords"],
             is_perishable=any(

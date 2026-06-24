@@ -254,8 +254,8 @@ class Simulation:
             self.event_queue, (time, self.event_counter, event_type, payload)
         )
         self.event_counter += 1
-    
-     # returns a zone map where zone[r][c] gives zone # (also picker_id) of location (r,c)
+
+    # returns a zone map where zone[r][c] gives zone # (also picker_id) of location (r,c)
     def coordinate_zoning(self, layout, coord_map):
         rows = len(layout)
         cols = len(layout[0])
@@ -321,13 +321,13 @@ class Simulation:
                 order_zones[zone_id].append(coord)
         return order_zones
 
-     # Greedy order assignment, picking whichever picker becomes available earliest
+    # Greedy order assignment, picking whichever picker becomes available earliest
     def select_amr(self):
         if len(self.amrs) == 0:
             return
         return min(self.amrs, key=lambda p: p.available_time)
 
-     # Build a nearest-neighbor route for the batch from staging through all item locations and back
+    # Build a nearest-neighbor route for the batch from staging through all item locations and back
     def build_route(self, orders, startEnd):
 
         unique_coords = list(dict.fromkeys(orders))
@@ -339,7 +339,7 @@ class Simulation:
             route.append(startEnd)
 
         return route
-    
+
     # build_route for directFollow and manual
     def build_route_2(self, orders):
         coords = []
@@ -363,12 +363,11 @@ class Simulation:
             route[zone_id] = self.build_route(coords, self.handoffPoints[zone_id])
 
         return route
-    
-     # Greedy order assignment, picking whichever picker becomes available earliest
+
+    # Greedy order assignment, picking whichever picker becomes available earliest
     def select_picker(self):
         return min(self.pickers, key=lambda p: p.available_time)
 
-    
     # Main simulation loop which processes events in chronological order until time exceeds SIM_TIME
     def run(self):
         while self.event_queue:
@@ -475,11 +474,11 @@ class Simulation:
     def order_similarity(self, a, b):
         depts_a = a
         depts_b = self.department_set(b)
-        
+
         union = depts_a | depts_b
         if not union:
             return 0.0
-        
+
         return len(depts_a & depts_b) / len(union)
 
     # Adds orders to batch starting with oldest order in queue, then any orders waiting over
@@ -490,7 +489,6 @@ class Simulation:
             return list(self.pending_orders), []
         selected_indices = {0}  # Seed = oldest order (index 0), always included
         seed = self.pending_orders[0]
-        
 
         # Force-include any order that has waited too long starting with oldest
         for i in range(1, len(self.pending_orders)):
@@ -504,15 +502,17 @@ class Simulation:
         for i in selected_indices:
             dept_next = self.department_set(self.pending_orders[i])
             total_intersection = total_intersection | dept_next
-        
+
         # Greedily fill remaining slots via. Jaccard with orders most similar to the first order (seed)
         remaining_indices = [
             i for i in range(1, len(self.pending_orders)) if i not in selected_indices
         ]
-        
 
         remaining_indices.sort(
-            key=lambda i: (-self.order_similarity(total_intersection, self.pending_orders[i]), i)
+            key=lambda i: (
+                -self.order_similarity(total_intersection, self.pending_orders[i]),
+                i,
+            )
         )
 
         for i in remaining_indices:
@@ -587,6 +587,13 @@ class Simulation:
                 self.metrics.total_perishables += item_count
                 if exposure > params.FREEZER_PERISHABLE_TIME:
                     self.metrics.spoiled_perishables += item_count
+
+        for order in batch.orders:
+            if order.completion_time <= order.arrival_time:
+                print("Err: completion time is earlier than order arrival time")
+            print("order arrival time: ", order.arrival_time)
+            print("due time: ", order.due_time)
+            print("difference: ", order.due_time - order.arrival_time)
 
         # Schedule next batch if enough orders
         if len(self.pending_orders) >= params.BATCH_SIZE_MIN:

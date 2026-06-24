@@ -28,7 +28,6 @@ class ManualSim(models.Simulation):
         batch_orders, self.pending_orders = super().select_similar_batch(batch_size)
 
         return models.Batch(orders=batch_orders, picker_id=picker.id, amr_id=None)
-    
 
     # Main order handling function which routes a batch, computes pick times, and schedules its completion
     def handle_batch(self, payload):
