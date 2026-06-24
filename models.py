@@ -114,6 +114,7 @@ class Metrics:
         self.amr_wait_for_human = 0.0
         self.amr_swap_count = 0
         self.batch_completion_count = 0
+        self.last_batch_size = 0
 
     # Record a completed order's comp.time and check if it missed the due time
     def record_completion(self, order: Order):
@@ -202,6 +203,7 @@ class Metrics:
         print(f"Throughput: {throughput:.2f} orders/hour")
         # print(f"AMR hot swaps: {self.amr_hot_swaps}")
         print(f"Batch count: {self.batch_completion_count:.2f} batches")
+        print(f"Last Batch Size: {self.last_batch_size:.2f} orders")
 
 
 # Parent simulation class that policy-specific simulations inherit from
@@ -418,6 +420,7 @@ class Simulation:
     # At sim end, push any remaining pending orders into a final batch
     def handle_end_flush(self):
         if self.pending_orders:
+            self.metrics.last_batch_size = len(self.pending_orders)
             self.schedule(self.time, "BATCH_DISPATCH", {"final": True})
 
     # Customer generates a new random shopping order and walks it at CUSTOMER_SPEED, adding browse
@@ -588,12 +591,9 @@ class Simulation:
                 if exposure > params.FREEZER_PERISHABLE_TIME:
                     self.metrics.spoiled_perishables += item_count
 
+        # Testing
         for order in batch.orders:
-            if order.completion_time <= order.arrival_time:
-                print("Err: completion time is earlier than order arrival time")
-            print("order arrival time: ", order.arrival_time)
-            print("due time: ", order.due_time)
-            print("difference: ", order.due_time - order.arrival_time)
+            print(order)
 
         # Schedule next batch if enough orders
         if len(self.pending_orders) >= params.BATCH_SIZE_MIN:

@@ -79,6 +79,7 @@ class ShuttleSim(models.Simulation):
         self.ensure_zone_state()
         for zone in range(self.num_zones):
             if self.zone_pending[zone]:
+                self.metrics.last_batch_size += len(self.zone_pending[zone])
                 self.schedule(
                     self.time, "BATCH_DISPATCH", {"zone": zone, "final": True}
                 )
