@@ -155,6 +155,14 @@ class ZoneWait(models.Simulation):
 
                 prev_node = node
 
+            # walking from last picking point to handoff point
+            r, c = self.handoffPoints[zone_id]
+            dist_last_to_zone_center = self.dist_map[prev_node][r, c]
+            picker_time += dist_last_to_zone_center / min(
+                params.WALKING_SPEED, params.AMR_SPEED
+            )
+
+            
             picker.available_time = picker_time
             picker_finish_times[zone_id] = picker_time
             picker.mark_idle(picker_time)
