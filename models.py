@@ -475,9 +475,11 @@ class Simulation:
     def order_similarity(self, a, b):
         depts_a = a
         depts_b = self.department_set(b)
+        
         union = depts_a | depts_b
         if not union:
             return 0.0
+        
         return len(depts_a & depts_b) / len(union)
 
     # Adds orders to batch starting with oldest order in queue, then any orders waiting over

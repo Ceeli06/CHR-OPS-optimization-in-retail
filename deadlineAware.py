@@ -51,10 +51,11 @@ class DeadlineSim(models.Simulation):
             selected_orders.append(seed_order)
             remaining_capacity -= 1
 
+            seed_departments = super().department_set(seed_order)
             # If we still have slots, sort the remaining non_urgent orders by similarity and append
             if remaining_capacity > 0 and non_urgent_orders:
                 non_urgent_orders.sort(
-                    key=lambda o: (-self.order_similarity(seed_order, o), o.due_time)
+                    key=lambda o: (-self.order_similarity(seed_departments, o), o.due_time)
                 )
 
                 while non_urgent_orders and remaining_capacity > 0:
