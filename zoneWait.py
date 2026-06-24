@@ -80,7 +80,7 @@ class ZoneWait(models.Simulation):
         if amr:
             amr.mark_busy(self.time)
 
-        route = super().build_zoning_route(
+        route = self.build_zoning_route(
             batch.zoned_orders
         )  # doesn't include start: staging and end: staging
         human_travel_distance = sum(

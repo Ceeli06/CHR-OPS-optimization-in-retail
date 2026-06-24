@@ -85,7 +85,7 @@ class ZoneDivided(models.Simulation):
         if amr:
             amr.mark_busy(self.time)
 
-        route = super().build_zoning_route(batch.zoned_orders)
+        route = self.build_zoning_route(batch.zoned_orders)
 
         human_travel_distance = sum(
             path_distance(zonePath, self.dist_map) for zonePath in route.values()

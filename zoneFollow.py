@@ -97,7 +97,7 @@ class ZoneFollow(models.Simulation):
             amr.mark_busy(self.time)
 
         self.metrics.batch_completion_count += 1
-        route = super().build_zoning_route(
+        route = self.build_zoning_route(
             batch.zoned_orders
         )  # doesn't include start: staging and end: staging
         human_travel_distance = sum(

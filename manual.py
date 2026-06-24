@@ -59,7 +59,7 @@ class ManualSim(models.Simulation):
 
         picker.mark_busy(self.time)
 
-        route = super().build_route_2(batch.orders)
+        route = self.build_route_2(batch.orders)
         travel_distance = path_distance(route, self.dist_map)
         travel_time = travel_distance / (
             params.WALKING_SPEED * params.MANUAL_PUSH_FACTOR

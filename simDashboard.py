@@ -25,6 +25,9 @@ import matplotlib
 matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.collections import LineCollection
+from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.lines import Line2D
 
 import params
 import models
@@ -45,6 +48,7 @@ POLICIES = [
     {
         "name": "Manual",
         "uses_amr": False,
+        "route_method": "build_route_2",
         "build": lambda ctx: manual.ManualSim(
             ctx.orders,
             ctx.pickers,
@@ -57,6 +61,7 @@ POLICIES = [
     {
         "name": "Direct Follow",
         "uses_amr": True,
+        "route_method": "build_route_2",
         "build": lambda ctx: directFollow.FollowSim(
             ctx.orders,
             ctx.pickers,
@@ -72,6 +77,7 @@ POLICIES = [
         "name": "Shuttle to Staging",
         "uses_amr": True,
         "patch_num_zones": True,
+        "route_method": "build_decoupled_route",
         "build": lambda ctx: shuttle2Staging.ShuttleSim(
             ctx.orders,
             ctx.pickers,
@@ -86,6 +92,7 @@ POLICIES = [
     {
         "name": "Deadline Aware",
         "uses_amr": True,
+        "route_method": "build_decoupled_route",
         "build": lambda ctx: deadlineAware.DeadlineSim(
             ctx.orders,
             ctx.pickers,
@@ -101,6 +108,7 @@ POLICIES = [
         "name": "Zone Follow",
         "uses_amr": True,
         "needs_dist_map_patch": True,
+        "route_method": "build_zoning_route",
         "build": lambda ctx: zoneFollow.ZoneFollow(
             ctx.orders,
             ctx.pickers,
@@ -116,6 +124,7 @@ POLICIES = [
         "name": "Zone Wait",
         "uses_amr": True,
         "needs_dist_map_patch": True,
+        "route_method": "build_zoning_route",
         "build": lambda ctx: zoneWait.ZoneWait(
             ctx.orders,
             ctx.pickers,
@@ -129,6 +138,7 @@ POLICIES = [
     {
         "name": "Zone Divided",
         "uses_amr": True,
+        "route_method": "build_zoning_route",
         "build": lambda ctx: zoneDivided.ZoneDivided(
             ctx.orders,
             ctx.pickers,
@@ -140,9 +150,6 @@ POLICIES = [
         ),
     },
 ]
-
-# Route-building method names
-ROUTE_METHOD_CANDIDATES = ["build_zoning_route", "build_decoupled_route", "build_route"]
 
 PARAM_FIELDS = [
     ("num_pickers", "Pickers", int, 1),
@@ -187,20 +194,18 @@ class RunContext:
         self.dist_map = dist_map
 
 
-def instrument_routes(sim):
+def instrument_routes(sim, method_name):
     captured = []
-    for method_name in ROUTE_METHOD_CANDIDATES:
-        original = getattr(sim, method_name, None)
-        if original is None:
-            continue
+    original = getattr(sim, method_name, None)
+    if original is None:
+        return captured
 
-        def wrapper(*args, _orig=original, **kwargs):
-            result = _orig(*args, **kwargs)
-            captured.append(result)
-            return result
+    def wrapper(*args, **kwargs):
+        result = original(*args, **kwargs)
+        captured.append(result)
+        return result
 
-        setattr(sim, method_name, wrapper)
-        break
+    setattr(sim, method_name, wrapper)
     return captured
 
 
@@ -244,7 +249,7 @@ def run_all_policies():
 
         ctx = build_run_context(layout, coord_map, dist_map, staging)
         sim = policy["build"](ctx)
-        captured_routes = instrument_routes(sim)
+        captured_routes = instrument_routes(sim, policy["route_method"])
 
         log_buffer = io.StringIO()
         with contextlib.redirect_stdout(log_buffer):
@@ -266,6 +271,12 @@ def run_all_policies():
         "policies": results,
     }
 
+
+# Colors a single selected route's line from its first stop (green) to its
+# last stop (red), so pick order is readable from color alone.
+ROUTE_ORDER_CMAP = LinearSegmentedColormap.from_list(
+    "route_order", ["#2ca02c", "#c44e52"]
+)
 
 # Route label per policy
 ROUTE_LABELS = {
@@ -520,17 +531,28 @@ class SimDashboard(tk.Tk):
 
         selection = self.route_batch_var.get()
         routes = data["routes"]
+        legend_handles = []
         if selection.startswith("Batch") and routes:
-            batch_idx = int(selection.split(" ")[1])
-            self._draw_routes(
-                ax, [routes[batch_idx]], staging, alpha=0.9, linewidth=2.0
+            batch_idx = int(selection.split(" ")[1]) - 1
+            legend_handles += self._draw_routes(
+                ax,
+                [routes[batch_idx]],
+                staging,
+                alpha=0.9,
+                linewidth=2.0,
+                order_detail=True,
             )
         else:
             self._draw_routes(ax, routes, staging, alpha=0.15, linewidth=1.2)
 
         handoff_points = data.get("handoffPoints")
         if handoff_points:
-            self._draw_zone_hop_path(ax, staging, handoff_points)
+            legend_handles.append(
+                self._draw_zone_hop_path(ax, staging, handoff_points)
+            )
+
+        if legend_handles:
+            ax.legend(handles=legend_handles, loc="upper right", fontsize=7)
 
         rows, cols = layout.shape
         ax.set_xlim(-1, cols)
@@ -569,23 +591,71 @@ class SimDashboard(tk.Tk):
                 grid, cmap="Pastel1", aspect="auto", interpolation="nearest", alpha=0.6
             )
 
-    def _draw_routes(self, ax, routes, staging, alpha, linewidth):
+    def _draw_routes(self, ax, routes, staging, alpha, linewidth, order_detail=False):
         pick_counts = Counter()
+        legend_handles = []
         for route in routes:
             if route is None:
                 continue
             paths = route.values() if isinstance(route, dict) else [route]
             for path in paths:
-                self._plot_path(ax, path, alpha, linewidth)
+                handles = self._plot_path(ax, path, alpha, linewidth, order_detail)
+                if handles and not legend_handles:
+                    legend_handles = handles
                 pick_counts.update(coord for coord in path if coord != staging)
-        self._draw_pick_markers(ax, pick_counts)
+        if not order_detail:
+            self._draw_pick_markers(ax, pick_counts)
+        return legend_handles
 
-    def _plot_path(self, ax, path, alpha, linewidth):
+    def _plot_path(self, ax, path, alpha, linewidth, order_detail=False):
         if not path or len(path) < 2:
-            return
+            return []
         cols = [c for _r, c in path]
         rows = [r for r, _c in path]
-        ax.plot(cols, rows, color="#c44e52", alpha=alpha, linewidth=linewidth)
+
+        if not order_detail:
+            ax.plot(cols, rows, color="#c44e52", alpha=alpha, linewidth=linewidth)
+            return []
+
+        # Color each segment along a green (1st stop) -> red (last stop) gradient
+        # and number every stop, so pick order is readable, not just inferred.
+        points = np.array([cols, rows]).T.reshape(-1, 1, 2)
+        segments = np.concatenate([points[:-1], points[1:]], axis=1)
+        seg_colors = ROUTE_ORDER_CMAP(np.linspace(0, 1, len(segments)))
+        ax.add_collection(
+            LineCollection(segments, colors=seg_colors, alpha=alpha, linewidth=linewidth, zorder=5)
+        )
+
+        # Draw badges from last stop back to first, so when a route loops back
+        # through a coordinate it already visited (e.g. start/end at staging),
+        # the earlier, more-intuitive number wins visually on top.
+        n_stops = len(path)
+        for i in reversed(range(n_stops)):
+            r, c = path[i]
+            stop_color = ROUTE_ORDER_CMAP(i / max(n_stops - 1, 1))
+            ax.annotate(
+                str(i + 1),
+                (c, r),
+                fontsize=6,
+                color="white",
+                ha="center",
+                va="center",
+                zorder=8,
+                bbox=dict(boxstyle="circle,pad=0.18", fc=stop_color, ec="white", lw=0.4),
+            )
+
+        return [
+            Line2D(
+                [0], [0], marker="o", color="w",
+                markerfacecolor=ROUTE_ORDER_CMAP(0.0), markersize=8,
+                label="Pick order: 1st stop",
+            ),
+            Line2D(
+                [0], [0], marker="o", color="w",
+                markerfacecolor=ROUTE_ORDER_CMAP(1.0), markersize=8,
+                label="Pick order: last stop",
+            ),
+        ]
 
     def _draw_pick_markers(self, ax, pick_counts):
         # Marks every coordinate where an item was actually picked along the selected route
@@ -613,7 +683,7 @@ class SimDashboard(tk.Tk):
         )
         cols = [c for _r, c in ordered]
         rows = [r for r, _c in ordered]
-        ax.plot(
+        (line,) = ax.plot(
             cols,
             rows,
             color="#2b8cbe",
@@ -623,7 +693,7 @@ class SimDashboard(tk.Tk):
             label="Approx. AMR path between zones",
         )
         ax.scatter(cols, rows, color="#2b8cbe", s=25, zorder=5)
-        ax.legend(loc="upper right", fontsize=7)
+        return line
 
     def _render_log_tab(self):
         if not self.last_results:
