@@ -142,8 +142,9 @@ class DeadlineSim(models.Simulation):
         unique_coords = list(dict.fromkeys(all_coords))
         meeting_point = (
             self.staging
-        )  # First coord of first item in batch (where AMR/picker meet)
-        # NOTE: why do you meet at the first item in the list rather than the first item in the route?
+        )  
+        # The meeting point of the picker and the AMR will be the first item
+        # in the batch, which will be an item from the oldest order in the batch
         if unique_coords:
             meeting_point = unique_coords[0]
 
