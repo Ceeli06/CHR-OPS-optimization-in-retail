@@ -115,6 +115,7 @@ class Metrics:
         self.amr_swap_count = 0
         self.batch_completion_count = 0
         self.last_batch_size = 0
+        self.total_time_to_finish = 0
 
     # Record a completed order's comp.time and check if it missed the due time
     def record_completion(self, order: Order):
@@ -131,6 +132,7 @@ class Metrics:
     # Compute and print all final metrics
     def finalize(self, sim_time: float, elapsed_time: float = None):
         elapsed_time = elapsed_time if elapsed_time is not None else sim_time
+        self.total_time_to_finish = elapsed_time
         avg_completion = (
             sum(self.completion_times) / len(self.completion_times)
             if self.completion_times
@@ -204,6 +206,7 @@ class Metrics:
         # print(f"AMR hot swaps: {self.amr_hot_swaps}")
         print(f"Batch count: {self.batch_completion_count:.2f} batches")
         print(f"Last Batch Size: {self.last_batch_size:.2f} orders")
+        print(f"Completion time for all orders: {self.total_time_to_finish/3600:.2f} hours")
 
 
 # Parent simulation class that policy-specific simulations inherit from
@@ -590,10 +593,6 @@ class Simulation:
                 self.metrics.total_perishables += item_count
                 if exposure > params.FREEZER_PERISHABLE_TIME:
                     self.metrics.spoiled_perishables += item_count
-
-        # Testing
-        for order in batch.orders:
-            print(order)
 
         # Schedule next batch if enough orders
         if len(self.pending_orders) >= params.BATCH_SIZE_MIN:
