@@ -303,7 +303,7 @@ if __name__ == "__main__":
         pickers,
         amrs,
         coord_map,
-        layout,
+        layout=layout,
         staging=staging,
         dist_map=dist_map,
         customers=customers,

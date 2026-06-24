@@ -206,7 +206,9 @@ class Metrics:
         # print(f"AMR hot swaps: {self.amr_hot_swaps}")
         print(f"Batch count: {self.batch_completion_count:.2f} batches")
         print(f"Last Batch Size: {self.last_batch_size:.2f} orders")
-        print(f"Completion time for all orders: {self.total_time_to_finish/3600:.2f} hours")
+        print(
+            f"Completion time for all orders: {self.total_time_to_finish/3600:.2f} hours"
+        )
 
 
 # Parent simulation class that policy-specific simulations inherit from
@@ -339,7 +341,7 @@ class Simulation:
         if not unique_coords:
             return [startEnd]
 
-        route = get_path(unique_coords, self.dist_map, startEnd, self.map)
+        route = get_path(unique_coords, self.dist_map, startEnd, self.map, self.layout)
         if not route or route[-1] != startEnd:
             route.append(startEnd)
 
@@ -355,7 +357,7 @@ class Simulation:
         if not unique_coords:
             return [self.staging]
 
-        route = get_path(unique_coords, self.dist_map, self.staging, self.map)
+        route = get_path(unique_coords, self.dist_map, self.staging,self.map, self.layout)
         if not route or route[-1] != self.staging:
             route.append(self.staging)
 

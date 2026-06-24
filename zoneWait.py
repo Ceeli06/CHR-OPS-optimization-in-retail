@@ -304,7 +304,7 @@ if __name__ == "__main__":
     amrs = [models.AMR(i, staging) for i in range(params.num_robots)]
 
     sim = ZoneWait(
-        orders, pickers, amrs, coord_map, layout, staging=staging, dist_map=dist_map
+        orders, pickers, amrs, coord_map, layout=layout, staging=staging, dist_map=dist_map
     )
     sim.coordinate_zoning(layout, coord_map)
     sim.run()
