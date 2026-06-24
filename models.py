@@ -1,8 +1,10 @@
 import params
 import heapq
+from collections import defaultdict
 from dataclasses import dataclass
-from orderGen import generate_order_helper, generate_order_coords
-from setup_layout import path_distance
+from orderGen import generate_order_helper, generate_order_coords, convert_to_walkable
+from setup_layout import path_distance, get_path
+import math
 
 
 # A customer order with items to be picked from the store
@@ -225,7 +227,6 @@ class Simulation:
 
         self.orders = sorted(orders, key=lambda o: o.arrival_time)
         self.pending_orders = []  # Orders waiting to be batched
-
         self.pickers = pickers
         self.amrs = amrs  # Unused in manual policy
         self.customers = customers or []
@@ -253,7 +254,105 @@ class Simulation:
             self.event_queue, (time, self.event_counter, event_type, payload)
         )
         self.event_counter += 1
+    
+     # returns a zone map where zone[r][c] gives zone # (also picker_id) of location (r,c)
+    def coordinate_zoning(self, layout, coord_map):
+        rows = len(layout)
+        cols = len(layout[0])
 
+        numPickers = len(self.pickers)
+        freezer_coords = coord_map["2"]
+        walkable_freezer_coords = []
+        for coord in freezer_coords:
+            coord = convert_to_walkable(coord, layout)
+            walkable_freezer_coords.append(coord)
+
+        zone = [[None for _ in range(cols)] for _ in range(rows)]
+
+        # freezer zone always assigned to last associate
+        for r, c in walkable_freezer_coords:
+            zone[r][c] = 0
+
+        # splits remaining space by x-coordinate
+        zone_width = cols / numPickers if numPickers else cols
+
+        for r in range(rows):
+            for c in range(cols):
+
+                if (r, c) in walkable_freezer_coords:
+                    continue
+
+                zone_id = int(c / zone_width)
+                zone_id = min(zone_id, numPickers - 1)
+
+                zone[r][c] = zone_id
+        return zone
+
+    # returns a dict mapping of zone id to zone handoff point (center of zone)
+    def get_zone_handoff_points(self, zone_map, layout):
+        zone_cells = defaultdict(list)
+
+        for r in range(len(zone_map)):
+            for c in range(len(zone_map[0])):
+                zone_id = zone_map[r][c]
+                if zone_id is None:
+                    continue
+                zone_cells[zone_id].append((r, c))
+
+        handoff_points = {}
+
+        for zone_id, cells in zone_cells.items():
+            avg_r = sum(r for r, c in cells) / len(cells)
+            avg_c = sum(c for r, c in cells) / len(cells)
+            coord = (math.floor(avg_r), math.floor(avg_c))
+            coord = convert_to_walkable(coord, layout)
+            handoff_points[zone_id] = coord
+        return handoff_points
+
+    # takes in a list of order coordinates (for one batch) and returns a list
+    # of the orders to which picker/zone they are assigned to (the index)
+    def split_orders_into_zones(self, orders, zone_map):
+        order_zones = defaultdict(list)
+
+        for order in orders:
+            for coord in order.coords:
+                r, c = coord
+                zone_id = zone_map[r][c]
+                order_zones[zone_id].append(coord)
+        return order_zones
+
+     # Greedy order assignment, picking whichever picker becomes available earliest
+    def select_amr(self):
+        if len(self.amrs) == 0:
+            return
+        return min(self.amrs, key=lambda p: p.available_time)
+
+     # Build a nearest-neighbor route for the batch from staging through all item locations and back
+    def build_route(self, orders, startEnd):
+
+        unique_coords = list(dict.fromkeys(orders))
+        if not unique_coords:
+            return [startEnd]
+
+        route = get_path(unique_coords, self.dist_map, startEnd, self.map)
+        if not route or route[-1] != startEnd:
+            route.append(startEnd)
+
+        return route
+
+    def build_zoning_route(self, zoned_orders):
+        route = {}
+
+        for zone_id, coords in zoned_orders.items():
+            route[zone_id] = self.build_route(coords, self.handoffPoints[zone_id])
+
+        return route
+    
+     # Greedy order assignment, picking whichever picker becomes available earliest
+    def select_picker(self):
+        return min(self.pickers, key=lambda p: p.available_time)
+
+    
     # Main simulation loop which processes events in chronological order until time exceeds SIM_TIME
     def run(self):
         while self.event_queue:

@@ -26,32 +26,7 @@ class FollowSim(models.Simulation):
             amrId = amr.id
 
         batch = models.Batch(orders=batch_orders, picker_id=picker.id, amr_id=amrId)
-        return batch
-
-    # Greedy order assignment, picking whichever picker becomes available earliest
-    def select_picker(self):
-        return min(self.pickers, key=lambda p: p.available_time)
-
-    def select_amr(self):
-        if len(self.amrs) == 0:
-            return
-        return min(self.amrs, key=lambda p: p.available_time)
-
-    # Build a nearest-neighbor route for the batch from staging through all item locations and back
-    def build_route(self, orders):
-        coords = []
-        for order in orders:
-            coords.extend(order.coords)
-
-        unique_coords = list(dict.fromkeys(coords))
-        if not unique_coords:
-            return [self.staging]
-
-        route = get_path(unique_coords, self.dist_map, self.staging, self.map)
-        if not route or route[-1] != self.staging:
-            route.append(self.staging)
-
-        return route
+        return batch 
 
     # Main order handling function which routes a batch, computes pick times, and schedules its completion
     def handle_batch(self, payload):
@@ -71,8 +46,8 @@ class FollowSim(models.Simulation):
 
         # Check picker availability before pulling orders from pending_orders,
         # so a busy picker doesn't cause orders to be lost on reschedule
-        picker = self.select_picker()
-        amr = self.select_amr()
+        picker = super().select_picker()
+        amr = super().select_amr()
 
         # Schedules batch dispatch in the future if picker and/or AMR not available and returns
         if picker.available_time > self.time or (
@@ -92,7 +67,7 @@ class FollowSim(models.Simulation):
         if amr:
             amr.mark_busy(self.time)
         self.metrics.batch_completion_count += 1
-        route = self.build_route(batch.orders)
+        route = super().build_route(batch.orders)
         travel_distance = path_distance(route, self.dist_map)
         human_travel_time = travel_distance / params.WALKING_SPEED
         amr_travel_time = travel_distance / params.AMR_SPEED

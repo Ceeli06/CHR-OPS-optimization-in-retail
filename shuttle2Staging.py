@@ -42,58 +42,14 @@ class ShuttleSim(models.Simulation):
         )
         self.layout = layout
 
-    # NOTE: would move this into initiate so you always know on run that it exists rather than checking everytime
     def ensure_zone_state(self):
         if hasattr(self, "zone_grid"):
             return
-        self.zone_grid = self.build_zone_grid()
-        self.handoff_points = self.build_handoff_points()
+        self.zone_grid = super().coordinate_zoning(self.layout, self.map)
+        self.handoff_points = super().get_zone_handoff_points(self.zone_grid, layout)
         self.zone_pending = {z: [] for z in range(self.num_zones)}
         self.picker_busy_time = {p.id: 0.0 for p in self.pickers}
 
-    # NOTE: may want to move this into models because the other zone policies also use it
-    def build_zone_grid(self):
-        rows = len(self.layout)
-        cols = len(self.layout[0])
-
-        freezer_coords = self.map.get("2", [])
-        walkable_freezer_coords = set()
-        for coord in freezer_coords:
-            walkable_freezer_coords.add(convert_to_walkable(coord, self.layout))
-
-        zone = [[None for _ in range(cols)] for _ in range(rows)]
-
-        for r, c in walkable_freezer_coords:
-            zone[r][c] = 0
-
-        zone_width = cols / self.num_zones
-        for r in range(rows):
-            for c in range(cols):
-                if (r, c) in walkable_freezer_coords:
-                    continue
-                zone_id = min(int(c / zone_width), self.num_zones - 1)
-                zone[r][c] = zone_id
-
-        return zone
-
-    # NOTE: may want to move this into models because the other zone policies also use it
-    def build_handoff_points(self):
-        zone_cells = defaultdict(list)
-        for r in range(len(self.zone_grid)):
-            for c in range(len(self.zone_grid[0])):
-                zone_id = self.zone_grid[r][c]
-                if zone_id is None:
-                    continue
-                zone_cells[zone_id].append((r, c))
-
-        handoff_points = {}
-        for zone_id, cells in zone_cells.items():
-            avg_r = sum(r for r, c in cells) / len(cells)
-            avg_c = sum(c for r, c in cells) / len(cells)
-            coord = (math.floor(avg_r), math.floor(avg_c))
-            handoff_points[zone_id] = convert_to_walkable(coord, self.layout)
-
-        return handoff_points
 
     # Assignes a zone to an order based on which zone contains the majority of its items
     def zone_for_order(self, order):
@@ -153,10 +109,6 @@ class ShuttleSim(models.Simulation):
         self.ensure_zone_state()
         return min(self.pickers, key=lambda p: self.picker_busy_time[p.id])
 
-    def select_amr(self):
-        if len(self.amrs) == 0:
-            return
-        return min(self.amrs, key=lambda p: p.available_time)
 
     # Builds a decoupled route that is not synchronized with another resource (other AMR/Picker)
     def build_decoupled_route(self, orders, start_node):
@@ -193,7 +145,7 @@ class ShuttleSim(models.Simulation):
             return
 
         picker = self.select_picker()
-        amr = self.select_amr()
+        amr = super().select_amr()
 
         # Reschedule if the chosen (least loaded) picker or AMR isn't free yet.
         if picker.available_time > self.time or (

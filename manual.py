@@ -29,9 +29,6 @@ class ManualSim(models.Simulation):
 
         return models.Batch(orders=batch_orders, picker_id=picker.id, amr_id=None)
 
-    # Greedy orrder assignment, picking whichever picker becomes available earliest
-    def select_picker(self):
-        return min(self.pickers, key=lambda p: p.available_time)
 
     # Build a nearest-neighbor route for the batch from staging through all item locations and back
     def build_route(self, orders):
@@ -67,7 +64,7 @@ class ManualSim(models.Simulation):
 
         # Check picker availability before pulling orders from pending_orders,
         # so a busy picker doesn't cause orders to be lost on reschedule
-        picker = self.select_picker()
+        picker = super().select_picker()
         if picker.available_time > self.time:
             self.schedule(picker.available_time, "BATCH_DISPATCH", payload)
             return
