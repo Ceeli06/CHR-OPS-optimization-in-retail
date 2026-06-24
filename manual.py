@@ -28,23 +28,7 @@ class ManualSim(models.Simulation):
         batch_orders, self.pending_orders = self.select_similar_batch(batch_size)
 
         return models.Batch(orders=batch_orders, picker_id=picker.id, amr_id=None)
-
-
-    # Build a nearest-neighbor route for the batch from staging through all item locations and back
-    def build_route(self, orders):
-        coords = []
-        for order in orders:
-            coords.extend(order.coords)
-
-        unique_coords = list(dict.fromkeys(coords))
-        if not unique_coords:
-            return [self.staging]
-
-        route = get_path(unique_coords, self.dist_map, self.staging, self.map)
-        if not route or route[-1] != self.staging:
-            route.append(self.staging)
-
-        return route
+    
 
     # Main order handling function which routes a batch, computes pick times, and schedules its completion
     def handle_batch(self, payload):
@@ -75,7 +59,7 @@ class ManualSim(models.Simulation):
 
         picker.mark_busy(self.time)
 
-        route = self.build_route(batch.orders)
+        route = super().build_route(batch.orders)
         travel_distance = path_distance(route, self.dist_map)
         travel_time = travel_distance / (
             params.WALKING_SPEED * params.MANUAL_PUSH_FACTOR

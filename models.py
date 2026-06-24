@@ -339,6 +339,22 @@ class Simulation:
             route.append(startEnd)
 
         return route
+    
+    # build_route for directFollow and manual
+    def build_route(self, orders):
+        coords = []
+        for order in orders:
+            coords.extend(order.coords)
+
+        unique_coords = list(dict.fromkeys(coords))
+        if not unique_coords:
+            return [self.staging]
+
+        route = get_path(unique_coords, self.dist_map, self.staging, self.map)
+        if not route or route[-1] != self.staging:
+            route.append(self.staging)
+
+        return route
 
     def build_zoning_route(self, zoned_orders):
         route = {}
@@ -457,6 +473,8 @@ class Simulation:
 
     # Gets Jaccard similarity of two order's department sets (0 = completely different, 1 = identical)
     def order_similarity(self, a, b):
+        print("a", a)
+        print("b", b)
         depts_a = self.department_set(a)
         depts_b = self.department_set(b)
         union = depts_a | depts_b
