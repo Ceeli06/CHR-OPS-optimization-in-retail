@@ -22,6 +22,10 @@ CATEGORYMAPPING = {
     "Staging": "S",
 }
 
+# Inverse of CATEGORYMAPPING, keyed by the same string form map_of_coords()
+# uses for grid codes (CATEGORYMAPPING's 1-9 values are ints, not strings).
+CODE_TO_DEPARTMENT = {str(code): name for name, code in CATEGORYMAPPING.items()}
+
 
 # Convert text-based store layout into a 2D numpy array (each char = one grid cell)
 def layout_to_array(layout_text):

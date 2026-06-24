@@ -28,10 +28,16 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.collections import LineCollection
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.lines import Line2D
+from matplotlib.patches import Rectangle
 
 import params
 import models
-from setup_layout import setup_layout, map_of_coords, all_distance_maps
+from setup_layout import (
+    setup_layout,
+    map_of_coords,
+    all_distance_maps,
+    CODE_TO_DEPARTMENT,
+)
 from orderGen import generate_orders
 
 import manual
@@ -209,6 +215,59 @@ def instrument_routes(sim, method_name):
     return captured
 
 
+# Reconstructs the actual walkable cell-by-cell path from 'start' to 'end' using
+# a precomputed BFS distance grid *from* 'start' (dist_map[start], as returned by
+# all_distance_maps()), walks backward from 'end', at each step moving to a
+# neighbor exactly one step closer to 'start', until 'start' is reached.
+def reconstruct_path(dist_from_start, start, end):
+    if start == end:
+        return [start]
+
+    rows, cols = dist_from_start.shape
+    path = [end]
+    current = end
+
+    while current != start:
+        r, c = current
+        d = dist_from_start[r, c]
+        next_node = None
+
+        for dr, dc in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+            nr, nc = r + dr, c + dc
+            if (
+                0 <= nr < rows
+                and 0 <= nc < cols
+                and dist_from_start[nr, nc] == d - 1
+            ):
+                next_node = (nr, nc)
+                break
+
+        if next_node is None:
+            break  # disconnected; shouldn't happen for reachable waypoints
+
+        path.append(next_node)
+        current = next_node
+
+    path.reverse()
+    return path
+
+
+# Expands a sparse waypoint list (ex. a captured picking route) into the full
+# sequence of walkable cells actually traversed between each consecutive pair,
+# so a plotted route follows real corridors instead of a straight line that can
+# cut through non-walkable cells.
+def expand_waypoints(waypoints, dist_map):
+    if not waypoints:
+        return []
+
+    expanded = [waypoints[0]]
+    for start, end in zip(waypoints[:-1], waypoints[1:]):
+        leg = reconstruct_path(dist_map[start], start, end)
+        expanded.extend(leg[1:])
+
+    return expanded
+
+
 def build_run_context(layout, coord_map, dist_map, staging):
     random.seed(ORDER_SEED)
     raw_orders = generate_orders(
@@ -268,6 +327,7 @@ def run_all_policies():
         "layout": layout,
         "coord_map": coord_map,
         "staging": staging,
+        "dist_map": dist_map,
         "policies": results,
     }
 
@@ -524,6 +584,7 @@ class SimDashboard(tk.Tk):
 
         layout = self.last_results["layout"]
         staging = self.last_results["staging"]
+        dist_map = self.last_results.get("dist_map")
         ax = self.route_ax
         ax.clear()
 
@@ -540,10 +601,13 @@ class SimDashboard(tk.Tk):
                 staging,
                 alpha=0.9,
                 linewidth=2.0,
+                dist_map=dist_map,
                 order_detail=True,
             )
         else:
-            self._draw_routes(ax, routes, staging, alpha=0.15, linewidth=1.2)
+            self._draw_routes(
+                ax, routes, staging, alpha=0.15, linewidth=1.2, dist_map=dist_map
+            )
 
         handoff_points = data.get("handoffPoints")
         if handoff_points:
@@ -591,7 +655,91 @@ class SimDashboard(tk.Tk):
                 grid, cmap="Pastel1", aspect="auto", interpolation="nearest", alpha=0.6
             )
 
-    def _draw_routes(self, ax, routes, staging, alpha, linewidth, order_detail=False):
+        self._draw_department_labels(ax, layout)
+
+    def _connected_regions(self, layout):
+        # Groups each department's cells into separate 4-connected components,
+        # so a department whose cells span multiple disconnected areas of the
+        # store (e.g. Fashion appearing in two separate aisle blocks) gets one
+        # labeled/outlined region per contiguous block instead of being treated
+        # as a single area.
+        rows, cols = layout.shape
+        visited = set()
+        regions = []
+
+        for r in range(rows):
+            for c in range(cols):
+                code = str(layout[r, c])
+                if code == "." or (r, c) in visited:
+                    continue
+
+                stack = [(r, c)]
+                visited.add((r, c))
+                cells = []
+                while stack:
+                    cr, cc = stack.pop()
+                    cells.append((cr, cc))
+                    for dr, dc in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+                        nr, nc = cr + dr, cc + dc
+                        if (
+                            0 <= nr < rows
+                            and 0 <= nc < cols
+                            and (nr, nc) not in visited
+                            and str(layout[nr, nc]) == code
+                        ):
+                            visited.add((nr, nc))
+                            stack.append((nr, nc))
+
+                regions.append((code, cells))
+
+        return regions
+
+    def _draw_department_labels(self, ax, layout):
+        # Labels each department region with its name, oriented to fit: wide-
+        # but-short regions (e.g. the top row) get horizontal text, narrow tall
+        # aisles get text rotated to run along their height. Also draws a
+        # border around each region so two different departments touching with
+        # no walkable gap between them still show a visible boundary.
+        for code, cells in self._connected_regions(layout):
+            if code == "S":
+                continue  # staging is already marked by the route start/AMR-hop markers
+            name = CODE_TO_DEPARTMENT.get(code)
+            if name is None:
+                continue
+            rows_list = [r for r, _c in cells]
+            cols_list = [c for _r, c in cells]
+            min_r, max_r = min(rows_list), max(rows_list)
+            min_c, max_c = min(cols_list), max(cols_list)
+
+            ax.add_patch(
+                Rectangle(
+                    (min_c - 0.5, min_r - 0.5),
+                    max_c - min_c + 1,
+                    max_r - min_r + 1,
+                    fill=False,
+                    edgecolor="#555555",
+                    linewidth=0.8,
+                    zorder=3,
+                )
+            )
+
+            rotation = 0 if (max_c - min_c) >= (max_r - min_r) else 90
+            ax.text(
+                (min_c + max_c) / 2,
+                (min_r + max_r) / 2,
+                name,
+                rotation=rotation,
+                ha="center",
+                va="center",
+                fontsize=6.5,
+                color="#222222",
+                zorder=4,
+                bbox=dict(boxstyle="round,pad=0.1", fc="white", ec="none", alpha=0.55),
+            )
+
+    def _draw_routes(
+        self, ax, routes, staging, alpha, linewidth, dist_map=None, order_detail=False
+    ):
         pick_counts = Counter()
         legend_handles = []
         for route in routes:
@@ -599,7 +747,9 @@ class SimDashboard(tk.Tk):
                 continue
             paths = route.values() if isinstance(route, dict) else [route]
             for path in paths:
-                handles = self._plot_path(ax, path, alpha, linewidth, order_detail)
+                handles = self._plot_path(
+                    ax, path, alpha, linewidth, dist_map, order_detail
+                )
                 if handles and not legend_handles:
                     legend_handles = handles
                 pick_counts.update(coord for coord in path if coord != staging)
@@ -607,11 +757,15 @@ class SimDashboard(tk.Tk):
             self._draw_pick_markers(ax, pick_counts)
         return legend_handles
 
-    def _plot_path(self, ax, path, alpha, linewidth, order_detail=False):
+    def _plot_path(self, ax, path, alpha, linewidth, dist_map=None, order_detail=False):
         if not path or len(path) < 2:
             return []
-        cols = [c for _r, c in path]
-        rows = [r for r, _c in path]
+
+        # Walk the actual grid corridors between waypoints instead of a
+        # straight line, which can cut through non-walkable department cells.
+        walked = expand_waypoints(path, dist_map) if dist_map else path
+        cols = [c for _r, c in walked]
+        rows = [r for r, _c in walked]
 
         if not order_detail:
             ax.plot(cols, rows, color="#c44e52", alpha=alpha, linewidth=linewidth)
