@@ -4,7 +4,7 @@ num_pickers = 1
 num_robots = 3
 num_customers = 30  # Representative of store congestion
 order_arrival_rate = (
-    1 / 30
+    1 / 300
 )  # Avg. orders per second for arrivalTimeGen's Poisson process (default:1/300sec{1/5min or 12/hr}))
 
 """Constants"""
