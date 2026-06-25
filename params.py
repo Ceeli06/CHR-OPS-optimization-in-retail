@@ -37,5 +37,5 @@ URGENCY_THRESHOLD = (
     30 * 60
 )  # Orders with remaining pick times under this threshold are auto-batched
 MANUAL_PUSH_FACTOR = (
-    1  # Factor that human walking speed is scaled by when pushing a manual cart
+    0.8  # Factor that human walking speed is scaled by when pushing a manual cart
 )
