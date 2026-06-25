@@ -17,7 +17,7 @@ class Order:
     is_perishable: bool = False
 
     pick_start_time: float = None  # When picker first touches this order's items
-    completion_time: float = None  # When all items are picked
+    at_staging_time: float = None  # When all items are picked
 
     due_time: float = 0.0
     perishable_coords: set = None  # Coords belonging to this order's perishable items
@@ -120,8 +120,9 @@ class Metrics:
     # Record a completed order's comp.time and check if it missed the due time
     def record_completion(self, order: Order):
         final_completion_time = (
-            order.completion_time - order.arrival_time
+            order.at_staging_time - order.arrival_time
         ) + params.STAGING_TIME
+        print("final_completion_time: ", final_completion_time)
         self.completion_times.append(final_completion_time)
 
         if final_completion_time > (order.due_time - order.arrival_time):
@@ -205,9 +206,9 @@ class Metrics:
         print(f"Throughput: {throughput:.2f} orders/hour")
         # print(f"AMR hot swaps: {self.amr_hot_swaps}")
         print(f"Batch count: {self.batch_completion_count:.2f} batches")
-        print(f"Last Batch Size: {self.last_batch_size:.2f} orders")
+        print(f"Flush Batch Size: {self.last_batch_size:.2f} orders")
         print(
-            f"Completion time for all orders: {self.total_time_to_finish/3600:.2f} hours"
+            f"Completion time for all orders/end of sim: {self.total_time_to_finish/3600:.2f} hours"
         )
 
 
@@ -579,19 +580,24 @@ class Simulation:
 
         # Record order completion times and perishible exposure times
         for order in batch.orders:
-            if order.completion_time is None:
-                order.completion_time = self.time
+            if order.at_staging_time is None:
+                order.at_staging_time = self.time
             self.metrics.record_completion(order)
             if order.is_perishable:
                 if order.perishable_picked_at is not None:
                     start_time = order.perishable_picked_at
+                # elif and else below this line should never be executed but is here for fallback
                 elif order.pick_start_time is not None:
                     start_time = order.pick_start_time
                 else:
                     start_time = order.arrival_time
-                exposure = order.completion_time - start_time
+                    
+                exposure = order.at_staging_time - start_time
                 item_count = self.perishable_item_count(order)
+                
+                
                 self.metrics.perishable_exposure.extend([exposure] * item_count)
+            
                 self.metrics.total_perishables += item_count
                 if exposure > params.FREEZER_PERISHABLE_TIME:
                     self.metrics.spoiled_perishables += item_count

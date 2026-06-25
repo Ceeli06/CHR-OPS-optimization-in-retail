@@ -4,14 +4,12 @@
 
 import params
 import models
-from dataclasses import dataclass
 from orderGen import generate_orders
 from setup_layout import (
     setup_layout,
     map_of_coords,
     path_distance,
     all_distance_maps,
-    get_path,
 )
 
 
@@ -59,12 +57,13 @@ class ManualSim(models.Simulation):
         picker.mark_busy(self.time)
 
         route = self.build_route_2(batch.orders)
-        travel_distance = path_distance(route, self.dist_map)
-        travel_time = travel_distance / (
-            params.WALKING_SPEED * params.MANUAL_PUSH_FACTOR
-        )
 
-        time_cursor = self.time + travel_time  # Holds time from batch start to end
+        total_travel_distance = path_distance(route, self.dist_map)
+        #travel_time = travel_distance / (
+        #    params.WALKING_SPEED * params.MANUAL_PUSH_FACTOR
+        #)
+
+        time_cursor = self.time #+ travel_time  # Holds time from batch start at initialization
 
         # Map each location to the orders that have items there
         coord_orders = {}
@@ -80,6 +79,7 @@ class ManualSim(models.Simulation):
             for coord in order.coords:
                 coord_orders.setdefault(coord, []).append(order)
 
+        prevNode = self.staging
         # Walk the route, picking items and updating order state at each stop
         for node in route[1:-1]:
             if node == self.staging:
@@ -87,6 +87,11 @@ class ManualSim(models.Simulation):
             orders_at_node = coord_orders.get(node, [])
             if not orders_at_node:
                 continue
+
+            r, c = node
+            dist_traveled = dist_map[prevNode][r, c]
+            time_cursor += dist_traveled / (params.WALKING_SPEED * params.MANUAL_PUSH_FACTOR)
+            prevNode = node
 
             pick_duration = len(orders_at_node) * (
                 params.HUMAN_PICK_TIME + params.CART_LOAD_TIME
@@ -108,17 +113,23 @@ class ManualSim(models.Simulation):
                     order.perishable_picked_at = time_cursor - pick_duration
                 decrement = sum(1 for coord in order.coords if coord == node)
                 order.items_remaining -= decrement  # Decrement items remaining in batch
-                if order.items_remaining <= 0 and order.completion_time is None:
-                    order.completion_time = time_cursor
-
+                
+        # accounts for time traveling from last node to staging
+        r, c = self.staging
+        dist_last_node_to_staging = dist_map[prevNode][r, c]
+        time_cursor += dist_last_node_to_staging / (params.WALKING_SPEED * params.MANUAL_PUSH_FACTOR)
         # Update walking distance of picker and global total
-        picker.distance_walked += travel_distance
-        self.metrics.human_distance += travel_distance
+        picker.distance_walked += total_travel_distance
+        self.metrics.human_distance += total_travel_distance
 
         # Update picker avalible time and schedule a pick complete event
         finish_time = time_cursor
+
         picker.available_time = finish_time
         self.metrics.batch_completion_count += 1
+        for order in batch.orders:
+            if order.items_remaining <= 0 and order.at_staging_time is None:
+                    order.at_staging_time = finish_time
         self.schedule(finish_time, "PICK_COMPLETE", batch)
 
 
@@ -135,41 +146,7 @@ if __name__ == "__main__":
     raw_orders = generate_orders(
         coord_map, params.SIM_TIME, layout, params.order_arrival_rate
     )
-    print(raw_orders[5])
-    orderZero = {
-        "visit_id": "88739",
-        "items": [
-            {"department": "Grocery", "quantity": 1},
-            {"department": "Perishable Grocery", "quantity": 1},
-        ],
-        "coords": [(7, 2), (1, 4)],
-        "arrival_time": 19.306187870727186,
-        "due_time": 19.306187870727186 + 10800,
-        "order_id": 0,
-    }
-    orderOne = {
-        "visit_id": "187612",
-        "items": [
-            {"department": "Fashion", "quantity": 1},
-            {"department": "Miscellaneous", "quantity": 1},
-        ],
-        "coords": [(4, 10), (7, 13)],
-        "arrival_time": 84.38360799705136,
-        "due_time": 84.38360799705136 + 10800,
-        "order_id": 1,
-    }
-    orderTwo = {
-        "visit_id": "62939",
-        "items": [
-            {"department": "Grocery", "quantity": 1},
-            {"department": "Home", "quantity": 1},
-        ],
-        "coords": [(5, 1), (7, 18)],
-        "arrival_time": 103.4150643467469,
-        "due_time": 103.4150643467469 + 10800,
-        "order_id": 2,
-    }
-    orderList = [orderZero, orderOne, orderTwo]
+
     orders = [
         models.Order(
             id=order["order_id"],
@@ -179,10 +156,10 @@ if __name__ == "__main__":
             coords=order["coords"],
             is_perishable=any(
                 str(item.get("department", "")).lower().find("perishable") >= 0
-                for item in order["items"]
+                for item in raw_order["items"]
             ),
         )
-        for order in orderList
+        for raw_order in raw_orders
     ]
 
     pickers = [models.Picker(i, staging) for i in range(params.num_pickers)]

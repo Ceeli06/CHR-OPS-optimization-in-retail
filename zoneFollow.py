@@ -260,8 +260,8 @@ class ZoneFollow(models.Simulation):
         self.metrics.human_idle += human_wait_for_amr
 
         for order in batch.orders:
-            if order.items_remaining <= 0 and order.completion_time is None:
-                order.completion_time = finish_time
+            if order.items_remaining <= 0 and order.at_staging_time is None:
+                order.at_staging_time = finish_time
 
         self.schedule(finish_time, "PICK_COMPLETE", batch)
 
