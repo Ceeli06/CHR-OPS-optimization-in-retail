@@ -234,11 +234,7 @@ def reconstruct_path(dist_from_start, start, end):
 
         for dr, dc in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
             nr, nc = r + dr, c + dc
-            if (
-                0 <= nr < rows
-                and 0 <= nc < cols
-                and dist_from_start[nr, nc] == d - 1
-            ):
+            if 0 <= nr < rows and 0 <= nc < cols and dist_from_start[nr, nc] == d - 1:
                 next_node = (nr, nc)
                 break
 
@@ -611,9 +607,7 @@ class SimDashboard(tk.Tk):
 
         handoff_points = data.get("handoffPoints")
         if handoff_points:
-            legend_handles.append(
-                self._draw_zone_hop_path(ax, staging, handoff_points)
-            )
+            legend_handles.append(self._draw_zone_hop_path(ax, staging, handoff_points))
 
         if legend_handles:
             ax.legend(handles=legend_handles, loc="upper right", fontsize=7)
@@ -777,7 +771,9 @@ class SimDashboard(tk.Tk):
         segments = np.concatenate([points[:-1], points[1:]], axis=1)
         seg_colors = ROUTE_ORDER_CMAP(np.linspace(0, 1, len(segments)))
         ax.add_collection(
-            LineCollection(segments, colors=seg_colors, alpha=alpha, linewidth=linewidth, zorder=5)
+            LineCollection(
+                segments, colors=seg_colors, alpha=alpha, linewidth=linewidth, zorder=5
+            )
         )
 
         # Draw badges from last stop back to first, so when a route loops back
@@ -795,18 +791,28 @@ class SimDashboard(tk.Tk):
                 ha="center",
                 va="center",
                 zorder=8,
-                bbox=dict(boxstyle="circle,pad=0.18", fc=stop_color, ec="white", lw=0.4),
+                bbox=dict(
+                    boxstyle="circle,pad=0.18", fc=stop_color, ec="white", lw=0.4
+                ),
             )
 
         return [
             Line2D(
-                [0], [0], marker="o", color="w",
-                markerfacecolor=ROUTE_ORDER_CMAP(0.0), markersize=8,
+                [0],
+                [0],
+                marker="o",
+                color="w",
+                markerfacecolor=ROUTE_ORDER_CMAP(0.0),
+                markersize=8,
                 label="Pick order: 1st stop",
             ),
             Line2D(
-                [0], [0], marker="o", color="w",
-                markerfacecolor=ROUTE_ORDER_CMAP(1.0), markersize=8,
+                [0],
+                [0],
+                marker="o",
+                color="w",
+                markerfacecolor=ROUTE_ORDER_CMAP(1.0),
+                markersize=8,
                 label="Pick order: last stop",
             ),
         ]

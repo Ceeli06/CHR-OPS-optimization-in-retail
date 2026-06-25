@@ -40,7 +40,6 @@ class ZoneFollow(models.Simulation):
         self.zoneMap = super().coordinate_zoning(layout, coord_map)
         self.handoffPoints = super().get_zone_handoff_points(self.zoneMap, layout)
 
-    
     def create_batch(self, pickers, amr, force=False):
         if not self.pending_orders:
             return None
@@ -59,7 +58,6 @@ class ZoneFollow(models.Simulation):
             orders=batch_orders, zoned_orders=zoned_orders, amr_id=amrId
         )
 
-    
     # Main order handling function which routes a batch, computes pick times, and schedules its completion
     def handle_batch(self, payload):
         final = isinstance(payload, dict) and payload.get("final", False)
@@ -235,7 +233,6 @@ class ZoneFollow(models.Simulation):
                 params.WALKING_SPEED, params.AMR_SPEED
             )
 
-
             picker.available_time = picker_time
             picker_finish_times[zone_id] = picker_time
             amr_finished_picking_zone_time = picker_time
@@ -286,6 +283,7 @@ if __name__ == "__main__":
         models.Order(
             id=raw_order["order_id"],
             arrival_time=raw_order["arrival_time"],
+            due_time=raw_order["arrival_time"] + params.ORDER_DUE_TIME,
             items=raw_order["items"],
             coords=raw_order["coords"],
             is_perishable=any(
@@ -305,7 +303,7 @@ if __name__ == "__main__":
         pickers,
         amrs,
         coord_map,
-        layout,
+        layout=layout,
         staging=staging,
         dist_map=dist_map,
         customers=customers,

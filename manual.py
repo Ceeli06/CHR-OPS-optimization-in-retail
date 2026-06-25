@@ -28,7 +28,6 @@ class ManualSim(models.Simulation):
         batch_orders, self.pending_orders = super().select_similar_batch(batch_size)
 
         return models.Batch(orders=batch_orders, picker_id=picker.id, amr_id=None)
-    
 
     # Main order handling function which routes a batch, computes pick times, and schedules its completion
     def handle_batch(self, payload):
@@ -81,6 +80,7 @@ class ManualSim(models.Simulation):
             for coord in order.coords:
                 coord_orders.setdefault(coord, []).append(order)
 
+        print(route)
         # Walk the route, picking items and updating order state at each stop
         for node in route[1:-1]:
             if node == self.staging:
@@ -136,24 +136,57 @@ if __name__ == "__main__":
     raw_orders = generate_orders(
         coord_map, params.SIM_TIME, layout, params.order_arrival_rate
     )
+    print(raw_orders[5])
+    orderZero = {
+        "visit_id": "88739",
+        "items": [
+            {"department": "Grocery", "quantity": 1},
+            {"department": "Perishable Grocery", "quantity": 1},
+        ],
+        "coords": [(7, 2), (1, 4)],
+        "arrival_time": 19.306187870727186,
+        "order_id": 0,
+    }
+    orderOne = {
+        "visit_id": "187612",
+        "items": [
+            {"department": "Fashion", "quantity": 1},
+            {"department": "Miscellaneous", "quantity": 1},
+        ],
+        "coords": [(4, 10), (7, 13)],
+        "arrival_time": 84.38360799705136,
+        "order_id": 1,
+    }
+    orderTwo = {
+        "visit_id": "62939",
+        "items": [
+            {"department": "Grocery", "quantity": 1},
+            {"department": "Home", "quantity": 1},
+        ],
+        "coords": [(5, 1), (7, 18)],
+        "arrival_time": 103.4150643467469,
+        "order_id": 2,
+    }
+    orderList = [orderZero, orderOne, orderTwo]
     orders = [
         models.Order(
-            id=raw_order["order_id"],
-            arrival_time=raw_order["arrival_time"],
-            items=raw_order["items"],
-            coords=raw_order["coords"],
+            id=order["order_id"],
+            arrival_time=order["arrival_time"],
+            due_time=order["arrival_time"] + params.ORDER_DUE_TIME,
+            items=order["items"],
+            coords=order["coords"],
             is_perishable=any(
                 str(item.get("department", "")).lower().find("perishable") >= 0
-                for item in raw_order["items"]
+                for item in order["items"]
             ),
         )
-        for raw_order in raw_orders
+        for order in orderList
     ]
 
     pickers = [models.Picker(i, staging) for i in range(params.num_pickers)]
     amrs = [models.AMR(i, staging) for i in range(params.num_robots)]
 
     sim = ManualSim(
-        orders, pickers, amrs, coord_map, staging=staging, dist_map=dist_map
+        orders, pickers, amrs, coord_map, staging=staging, dist_map=dist_map, layout = layout
     )
     sim.run()
