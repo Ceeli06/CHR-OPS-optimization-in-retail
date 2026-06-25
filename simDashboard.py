@@ -608,7 +608,9 @@ class SimDashboard(tk.Tk):
 
         handoff_points = data.get("handoffPoints")
         if handoff_points:
-            legend_handles.append(self._draw_zone_hop_path(ax, staging, handoff_points))
+            legend_handles.append(
+                self._draw_zone_hop_path(ax, staging, handoff_points, dist_map=dist_map)
+            )
 
         if legend_handles:
             ax.legend(handles=legend_handles, loc="upper right", fontsize=7)
@@ -836,14 +838,15 @@ class SimDashboard(tk.Tk):
             zorder=6,
         )
 
-    def _draw_zone_hop_path(self, ax, staging, handoff_points):
+    def _draw_zone_hop_path(self, ax, staging, handoff_points, dist_map=None):
         ordered = (
             [staging]
             + [coord for _zone, coord in sorted(handoff_points.items())]
             + [staging]
         )
-        cols = [c for _r, c in ordered]
-        rows = [r for r, _c in ordered]
+        walked = expand_waypoints(ordered, dist_map) if dist_map else ordered
+        cols = [c for _r, c in walked]
+        rows = [r for r, _c in walked]
         (line,) = ax.plot(
             cols,
             rows,
@@ -851,9 +854,12 @@ class SimDashboard(tk.Tk):
             linestyle="--",
             linewidth=1.5,
             alpha=0.7,
+            zorder=9,
             label="Approx. AMR path between zones",
         )
-        ax.scatter(cols, rows, color="#2b8cbe", s=25, zorder=5)
+        stop_cols = [c for _r, c in ordered]
+        stop_rows = [r for r, _c in ordered]
+        ax.scatter(stop_cols, stop_rows, color="#2b8cbe", s=150, zorder=5.5)
         return line
 
     def _render_log_tab(self):
