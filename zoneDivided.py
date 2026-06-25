@@ -242,10 +242,10 @@ class ZoneDivided(models.Simulation):
         self.metrics.human_idle += human_wait_time
         # An order isn't complete until every zone it touched has delivered its portion
         for order in batch.orders:
-            if order.items_remaining <= 0 and order.completion_time is None:
+            if order.items_remaining <= 0 and order.at_staging_time is None:
                 zones = order_zones.get(id(order))
                 if zones:
-                    order.completion_time = max(zone_delivery_time[z] for z in zones)
+                    order.at_staging_time = max(zone_delivery_time[z] for z in zones)
 
         finish_time = max(zone_delivery_time.values(), default=self.time)
         self.metrics.batch_completion_count += 1

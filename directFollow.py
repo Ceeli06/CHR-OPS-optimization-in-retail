@@ -172,8 +172,8 @@ class FollowSim(models.Simulation):
 
         # order is not complete until entire batch is returned to staging
         for order in batch.orders:
-            if order.items_remaining == 0 and order.completion_time is None:
-                order.completion_time = finish_time
+            if order.items_remaining == 0 and order.at_staging_time is None:
+                order.at_staging_time = finish_time
 
         # Update picker available time; whichever AMR is currently active still has to
         # travel back to staging and unload before it's free for its next dispatch
