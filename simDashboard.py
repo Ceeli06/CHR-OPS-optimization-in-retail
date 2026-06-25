@@ -62,6 +62,7 @@ POLICIES = [
             ctx.coord_map,
             staging=ctx.staging,
             dist_map=ctx.dist_map,
+            layout=ctx.layout,
         ),
     },
     {
@@ -273,7 +274,7 @@ def build_run_context(layout, coord_map, dist_map, staging):
         models.Order(
             id=raw["order_id"],
             arrival_time=raw["arrival_time"],
-            due_time=raw["arrival_time"] + params.ORDER_DUE_TIME,
+            due_time=raw["due_time"],
             items=raw["items"],
             coords=raw["coords"],
         )

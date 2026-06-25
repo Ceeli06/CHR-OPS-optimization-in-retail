@@ -80,7 +80,6 @@ class ManualSim(models.Simulation):
             for coord in order.coords:
                 coord_orders.setdefault(coord, []).append(order)
 
-        print(route)
         # Walk the route, picking items and updating order state at each stop
         for node in route[1:-1]:
             if node == self.staging:
@@ -145,6 +144,7 @@ if __name__ == "__main__":
         ],
         "coords": [(7, 2), (1, 4)],
         "arrival_time": 19.306187870727186,
+        "due_time": 19.306187870727186 + 10800,
         "order_id": 0,
     }
     orderOne = {
@@ -155,6 +155,7 @@ if __name__ == "__main__":
         ],
         "coords": [(4, 10), (7, 13)],
         "arrival_time": 84.38360799705136,
+        "due_time": 84.38360799705136 + 10800,
         "order_id": 1,
     }
     orderTwo = {
@@ -165,6 +166,7 @@ if __name__ == "__main__":
         ],
         "coords": [(5, 1), (7, 18)],
         "arrival_time": 103.4150643467469,
+        "due_time": 103.4150643467469 + 10800,
         "order_id": 2,
     }
     orderList = [orderZero, orderOne, orderTwo]
@@ -172,7 +174,7 @@ if __name__ == "__main__":
         models.Order(
             id=order["order_id"],
             arrival_time=order["arrival_time"],
-            due_time=order["arrival_time"] + params.ORDER_DUE_TIME,
+            due_time=order["due_time"],
             items=order["items"],
             coords=order["coords"],
             is_perishable=any(

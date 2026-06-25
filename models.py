@@ -124,7 +124,7 @@ class Metrics:
         ) + params.STAGING_TIME
         self.completion_times.append(final_completion_time)
 
-        if final_completion_time > params.ORDER_DUE_TIME:
+        if final_completion_time > (order.due_time - order.arrival_time):
             self.late_orders += 1
 
         self.total_orders += 1

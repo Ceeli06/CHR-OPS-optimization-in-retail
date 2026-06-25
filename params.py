@@ -1,7 +1,4 @@
-import random
-
 """Parameters"""
-
 num_pickers = 4 #default: 4 pickers
 num_robots = 4 #default: 4 AMRs
 num_customers = 30  # Representative of store congestion (default: 30 customers)
@@ -9,11 +6,13 @@ order_arrival_rate = (
     1 / 450
 )  # Avg. orders per second for arrivalTimeGen's Poisson process (default:1/450sec{8 orders/hour}))
 
+
 """Constants"""
 # Perishable items must reach depot within this time or spoil
 FREEZER_PERISHABLE_TIME = 60 * 60  # 1 hour
-# Orders exceeding this time are marked late
-ORDER_DUE_TIME = random.uniform(2*60*60, 4*60*60)  # 2-4 hours depending on customer shipping option choice
+# Orders have between ORDER_DUE_TIME_MIN and ORDER_DUE_TIME_MAX to be fulfilled
+ORDER_DUE_TIME_MIN = 2 * 60 * 60  # 2 hours
+ORDER_DUE_TIME_MAX = 4 * 60 * 60  # 4 hours
 STAGING_TIME = 2 * 60 * 60  # 2 hours
 WALKING_SPEED = 1.3  # Walking speed in meters per second
 HUMAN_PICK_TIME = 20  # Time to find and manually pick one item at the pick location
@@ -33,9 +32,5 @@ SIM_TIME = 8 * 60 * 60  # Simulates 8 hour workday
 SIMILARITY_BATCH_MAX_WAIT = 30 * 60  # 30 minutes
 # If the pending queue has been non-empty this long without reaching BATCH_SIZE_MIN, force a dispatch
 BATCH_TIMEOUT = 5 * 60  # 5 minutes
-URGENCY_THRESHOLD = (
-    30 * 60
-)  # Orders with remaining pick times under this threshold are auto-batched
-MANUAL_PUSH_FACTOR = (
-    0.8  # Factor that human walking speed is scaled by when pushing a manual cart
-)
+URGENCY_THRESHOLD = 30 * 60  # Orders with remaining pick times under this threshold are auto-batched
+MANUAL_PUSH_FACTOR = 0.8  # Factor that human walking speed is scaled by when pushing a manual cart
