@@ -164,9 +164,7 @@ class ZoneDivided(models.Simulation):
             r, c = self.handoffPoints[zone_id]
             dist_last_to_zone_center = self.dist_map[prev_node][r, c]
             picker_time += dist_last_to_zone_center / params.WALKING_SPEED
-            picker.available_time = picker_time
             picker_finish_times[zone_id] = picker_time
-            picker.mark_idle(picker_time)
 
         zone_delivery_time = {}
         amr_wait_time = 0.0
@@ -187,6 +185,7 @@ class ZoneDivided(models.Simulation):
                 trip_sizes = [base + (1 if i < extra else 0) for i in range(num_trips)]
 
                 last_delivery_time = picker_finish
+                last_pickup_time = picker_finish
                 for trip_idx, trip_items in enumerate(trip_sizes):
                     amr_id = min(tentative_available, key=tentative_available.get)
                     zone_amr = amr_by_id[amr_id]
@@ -211,6 +210,7 @@ class ZoneDivided(models.Simulation):
                         human_wait_time += arrival - ready_time
 
                     pickup_time = max(arrival, ready_time)
+                    last_pickup_time = pickup_time
                     loaded_time = pickup_time + params.CART_LOAD_TIME
 
                     back_dist = path_distance(
@@ -231,9 +231,18 @@ class ZoneDivided(models.Simulation):
                         self.metrics.amr_swap_count += 1
 
                 zone_delivery_time[zone_id] = last_delivery_time
+
+                # Picker is occupied until the AMR finishes taking ALL items from the Zone's batch
+                picker = self.pickers[zone_id]
+                free_time = last_pickup_time if num_trips > 1 else picker_finish
+                picker.available_time = free_time
+                picker.mark_idle(free_time)
         else:
             for zone_id in route.keys():
                 zone_delivery_time[zone_id] = picker_finish_times[zone_id]
+                picker = self.pickers[zone_id]
+                picker.available_time = picker_finish_times[zone_id]
+                picker.mark_idle(picker_finish_times[zone_id])
 
         self.metrics.amr_wait_for_human += amr_wait_time
         self.metrics.human_distance += human_travel_distance
