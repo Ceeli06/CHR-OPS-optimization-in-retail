@@ -163,7 +163,7 @@ class FollowSim(models.Simulation):
 
         # accounts for last item --> staging
         r,c = self.staging
-        last_dist = dist_map[prev_node][r, c]
+        last_dist = self.dist_map[prev_node][r, c]
         time_cursor += last_dist / min(params.WALKING_SPEED, params.AMR_SPEED) 
         # Update walking distance of picker and global total
         picker.distance_walked += travel_distance
