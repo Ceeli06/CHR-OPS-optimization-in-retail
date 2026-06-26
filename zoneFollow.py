@@ -125,14 +125,19 @@ class ZoneFollow(models.Simulation):
         human_wait_for_amr = 0
         amr_finished_picking_prev_zone_time = max(amr.available_time, self.time)
         items_carried = 0
-
+        
         for zone_id in sorted(route.keys(), reverse=True):
             zonePath = route[zone_id]
+            print(zonePath)
 
             picker = self.pickers[zone_id]
             r, c = zonePath[0]
-            amr_arrival_time = (self.dist_map[prev_amr_coord][r, c]) / params.AMR_SPEED
-            prev_amr_coord = self.handoffPoints[zone_id]
+            dist_to_next_zone = self.dist_map[prev_amr_coord][r, c]
+            self.metrics.amr_distance+=dist_to_next_zone
+            amr_arrival_time = (dist_to_next_zone) / params.AMR_SPEED
+            #prev_amr_coord = self.handoffPoints[zone_id]
+            if len(zonePath) > 1:
+                prev_amr_coord = zonePath[-2] #last item
 
             picker_ready = picker.available_time
             amr_ready = amr_finished_picking_prev_zone_time + amr_arrival_time
@@ -143,9 +148,9 @@ class ZoneFollow(models.Simulation):
             picker_time = start_time
 
             # calculates amr idle time automatically
-            if amr_wait_time > 0 and amr:
-                amr.mark_idle(amr_ready)
-                amr.mark_busy(start_time)
+            #if amr_wait_time > 0 and amr:
+            #    amr.mark_idle(amr_ready)
+            #    amr.mark_busy(start_time)
 
             picker.mark_busy(start_time)
             prev_node = zonePath[0]
@@ -154,6 +159,7 @@ class ZoneFollow(models.Simulation):
                 if node == self.staging:
                     break
                 walk_dist = self.dist_map[prev_node][node[0], node[1]]
+                self.metrics.amr_distance+=walk_dist
                 walk_time = walk_dist / (min(params.WALKING_SPEED, params.AMR_SPEED))
                 picker_time += walk_time
 
@@ -161,22 +167,17 @@ class ZoneFollow(models.Simulation):
                 if not orders_at_node:
                     continue
 
-                if self.zoneFollow:
-                    pick_duration = len(orders_at_node) * (
+                pick_duration = len(orders_at_node) * (
                         params.HUMAN_PICK_TIME + params.CART_LOAD_TIME
                     )
-                    pick_duration += self.customer_collisions(
+                
+                pick_duration += self.customer_collisions(
                         node, picker_time, picker_time + pick_duration
                     )
-                else:
-                    pick_duration = len(orders_at_node) * (
-                        params.HUMAN_PICK_TIME + params.CART_LOAD_TIME
-                    )  # accounts for moving items to AMR @ end
-                    pick_duration += self.customer_collisions(
-                        node, picker_time, picker_time + pick_duration
-                    )
+                
 
                 picker_time += pick_duration
+                
 
                 unique_orders = {id(o): o for o in orders_at_node}
 
@@ -190,6 +191,7 @@ class ZoneFollow(models.Simulation):
                         and node in order.perishable_coords
                     ):
                         order.perishable_picked_at = picker_time - pick_duration
+                        print("PERISHABLE PICKED AT: ", order.perishable_picked_at)
 
                     decrement = sum(1 for c in order.coords if c == node)
                     order.items_remaining -= decrement
@@ -228,25 +230,23 @@ class ZoneFollow(models.Simulation):
 
                 prev_node = node
 
-            # walking from last picking point to handoff point
+            # walking from last picking point to handoff point for picker
             r, c = self.handoffPoints[zone_id]
+            amr_finished_picking_prev_zone_time = picker_time #amr doesn't walk back to staging, instead moves directly to next zone
             dist_last_to_zone_center = self.dist_map[prev_node][r, c]
             picker_time += dist_last_to_zone_center / min(
                 params.WALKING_SPEED, params.AMR_SPEED
             )
-
             picker.available_time = picker_time
             picker_finish_times[zone_id] = picker_time
-            amr_finished_picking_zone_time = picker_time
+            #amr_finished_picking_zone_time = picker_time
             picker.mark_idle(picker_time)
 
-        amr_finish_time = amr_finished_picking_zone_time
+        amr_finish_time = amr_finished_picking_prev_zone_time
         # Last zone -> staging
-        zone_ids = sorted(route.keys(), reverse=True)
-        last_zone = zone_ids[-1]
 
         travel_dist = path_distance(
-            [self.handoffPoints[last_zone], self.staging], self.dist_map
+            [prev_amr_coord, self.staging], self.dist_map
         )
 
         amr_finish_time += travel_dist / params.AMR_SPEED
@@ -281,6 +281,40 @@ if __name__ == "__main__":
     raw_orders = generate_orders(
         coord_map, params.SIM_TIME, layout, params.order_arrival_rate
     )
+    orderZero = {
+        "visit_id": "88739",
+        "items": [
+        {"department": "Grocery", "quantity": 1},
+        {"department": "Perishable Grocery", "quantity": 1},
+        ],
+        "coords": [(7, 2), (1, 4)],
+        "arrival_time": 19.306187870727186,
+        "due_time": 300,
+        "order_id": 0,
+        }
+    orderOne = {
+        "visit_id": "187612",
+        "items": [
+        {"department": "Fashion", "quantity": 1},
+        {"department": "Miscellaneous", "quantity": 1},
+        ],
+        "coords": [(4, 10), (7, 13)],
+        "arrival_time": 84.38360799705136,
+        "due_time": 300,
+        "order_id": 1,
+        }
+    orderTwo = {
+        "visit_id": "62939",
+        "items": [
+        {"department": "Grocery", "quantity": 1},
+        {"department": "Home", "quantity": 1},
+        ],
+        "coords": [(5, 1), (7, 18)],
+        "arrival_time": 103.4150643467469,
+        "due_time": 300,
+        "order_id": 2,
+    }
+    orderList = [orderZero, orderOne, orderTwo]
     orders = [
         models.Order(
             id=raw_order["order_id"],
@@ -293,7 +327,7 @@ if __name__ == "__main__":
                 for item in raw_order["items"]
             ),
         )
-        for raw_order in raw_orders
+        for raw_order in orderList
     ]
 
     pickers = [models.Picker(i, staging) for i in range(params.num_pickers)]
