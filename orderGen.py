@@ -4,6 +4,7 @@ import json
 import os
 import random
 import copy
+import params
 from setup_layout import CATEGORYMAPPING
 
 # Get and set the directory path for historical order dataset
@@ -99,12 +100,14 @@ def generate_order_arrival_times(sim_time, arrival_rate):
 def generate_order(coord_map, layout, arrival_time=None):
     order = generate_order_helper()
     coords = generate_order_coords(order["items"], coord_map, layout)
+    due_window = random.uniform(params.ORDER_DUE_TIME_MIN, params.ORDER_DUE_TIME_MAX) # Amount of time to fulfill the order
 
     return {
         "visit_id": order["visit_id"],
         "items": order["items"],
         "coords": coords,
         "arrival_time": arrival_time,
+        "due_time": arrival_time + due_window if arrival_time is not None else None, # Actual time the order is due
     }
 
 

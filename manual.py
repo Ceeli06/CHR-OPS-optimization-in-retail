@@ -89,7 +89,7 @@ class ManualSim(models.Simulation):
                 continue
 
             r, c = node
-            dist_traveled = dist_map[prevNode][r, c]
+            dist_traveled = self.dist_map[prevNode][r, c]
             time_cursor += dist_traveled / (params.WALKING_SPEED * params.MANUAL_PUSH_FACTOR)
             prevNode = node
 
@@ -128,7 +128,7 @@ class ManualSim(models.Simulation):
                 
         # accounts for time traveling from last node to staging
         r, c = self.staging
-        dist_last_node_to_staging = dist_map[prevNode][r, c]
+        dist_last_node_to_staging = self.dist_map[prevNode][r, c]
         time_cursor += dist_last_node_to_staging / (params.WALKING_SPEED * params.MANUAL_PUSH_FACTOR)
         time_cursor += params.AMR_AND_CART_UNLOAD_TIME * item_count # unloading time @ end (picker must be present)
         # Update walking distance of picker and global total
@@ -164,7 +164,7 @@ if __name__ == "__main__":
         models.Order(
             id=raw_order["order_id"],
             arrival_time=raw_order["arrival_time"],
-            due_time=raw_order["arrival_time"] + params.ORDER_DUE_TIME,
+            due_time=raw_order["due_time"],
             items=raw_order["items"],
             coords=raw_order["coords"],
             is_perishable=any(

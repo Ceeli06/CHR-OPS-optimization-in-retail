@@ -121,7 +121,7 @@ class ShuttleSim(models.Simulation):
         if not unique_coords:
             return [start_node]
 
-        route = get_path(unique_coords, self.dist_map, start_node, self.map)
+        route = get_path(unique_coords, self.dist_map, start_node, self.map, self.layout)
         return route[:-1]
 
     # Main order handling function which routes a batch, computes pick times, and schedules its
@@ -230,12 +230,16 @@ class ShuttleSim(models.Simulation):
             if not orders_at_node:
                 continue
             if amr:
-                pick_duration = len(orders_at_node) * params.CART_LOAD_TIME
+                pick_duration = len(orders_at_node) * (
+                    params.HUMAN_PICK_TIME + params.CART_LOAD_TIME
+                )
                 pick_duration += self.customer_collisions(
                     node, time_cursor, time_cursor + pick_duration
                 )
             else:
-                pick_duration = len(orders_at_node) * params.HUMAN_PICK_TIME
+                pick_duration = len(orders_at_node) * (
+                    params.HUMAN_PICK_TIME + params.CART_LOAD_TIME
+                )
             if pick_duration > 0:
                 time_cursor += pick_duration
 
@@ -339,7 +343,7 @@ if __name__ == "__main__":
         models.Order(
             id=raw_order["order_id"],
             arrival_time=raw_order["arrival_time"],
-            due_time=raw_order["arrival_time"] + params.ORDER_DUE_TIME,
+            due_time=raw_order["due_time"],
             items=raw_order["items"],
             coords=raw_order["coords"],
             is_perishable=any(

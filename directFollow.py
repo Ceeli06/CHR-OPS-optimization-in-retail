@@ -242,11 +242,11 @@ if __name__ == "__main__":
     orderList = [orderZero, orderOne, orderTwo]
     orders = [
         models.Order(
-            id=order["order_id"],
-            arrival_time=order["arrival_time"],
-            due_time=order["arrival_time"] + params.ORDER_DUE_TIME,
-            items=order["items"],
-            coords=order["coords"],
+            id=raw_order["order_id"],
+            arrival_time=raw_order["arrival_time"],
+            due_time=raw_order["due_time"],
+            items=raw_order["items"],
+            coords=raw_order["coords"],
             is_perishable=any(
                 str(item.get("department", "")).lower().find("perishable") >= 0
                 for item in order["items"]

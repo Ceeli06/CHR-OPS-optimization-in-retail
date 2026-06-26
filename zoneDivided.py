@@ -139,7 +139,7 @@ class ZoneDivided(models.Simulation):
                 else:
                     pick_duration = len(orders_at_node) * (
                         params.HUMAN_PICK_TIME + params.CART_LOAD_TIME
-                    )  # accounts for moving items to AMR @ end
+                    )  
 
                 picker_time += pick_duration
 
@@ -269,7 +269,7 @@ if __name__ == "__main__":
         models.Order(
             id=raw_order["order_id"],
             arrival_time=raw_order["arrival_time"],
-            due_time=raw_order["arrival_time"] + params.ORDER_DUE_TIME,
+            due_time=raw_order["due_time"],
             items=raw_order["items"],
             coords=raw_order["coords"],
             is_perishable=any(
