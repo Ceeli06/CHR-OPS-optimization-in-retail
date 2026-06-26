@@ -209,37 +209,7 @@ if __name__ == "__main__":
     raw_orders = generate_orders(
         coord_map, params.SIM_TIME, layout, params.order_arrival_rate
     )
-    orderZero = {
-        "visit_id": "88739",
-        "items": [
-        {"department": "Grocery", "quantity": 1},
-        {"department": "Perishable Grocery", "quantity": 1},
-        ],
-        "coords": [(7, 2), (1, 4)],
-        "arrival_time": 19.306187870727186,
-        "order_id": 0,
-        }
-    orderOne = {
-        "visit_id": "187612",
-        "items": [
-        {"department": "Fashion", "quantity": 1},
-        {"department": "Miscellaneous", "quantity": 1},
-        ],
-        "coords": [(4, 10), (7, 13)],
-        "arrival_time": 84.38360799705136,
-        "order_id": 1,
-        }
-    orderTwo = {
-        "visit_id": "62939",
-        "items": [
-        {"department": "Grocery", "quantity": 1},
-        {"department": "Home", "quantity": 1},
-        ],
-        "coords": [(5, 1), (7, 18)],
-        "arrival_time": 103.4150643467469,
-        "order_id": 2,
-        }
-    orderList = [orderZero, orderOne, orderTwo]
+    
     orders = [
         models.Order(
             id=raw_order["order_id"],
@@ -249,10 +219,10 @@ if __name__ == "__main__":
             coords=raw_order["coords"],
             is_perishable=any(
                 str(item.get("department", "")).lower().find("perishable") >= 0
-                for item in order["items"]
+                for item in raw_order["items"]
             ),
         )
-        for order in orderList
+        for raw_order in raw_orders
     ]
 
     pickers = [models.Picker(i, staging) for i in range(params.num_pickers)]
