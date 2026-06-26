@@ -185,7 +185,7 @@ class ZoneWait(models.Simulation):
                 # capacity, swap to a replacement before traveling to this zone
                 if (
                     items_carried > 0
-                    and items_carried + zone_items > params.AMR_CAPACITY
+                    and items_carried + zone_items > params.AMR_AND_CART_CAPACITY
                 ):
                     return_dist, return_time, unload_time = self.amr_return_leg(
                         current_amr_node, items_carried

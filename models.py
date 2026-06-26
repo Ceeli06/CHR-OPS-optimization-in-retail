@@ -203,7 +203,7 @@ class Metrics:
         print(f"Avg perishable exposure time: {avg_exposure/60:.2f} min")
         print(f"Spoiled perishables: {spoiled_pct:.2f}%")
         print(f"Throughput: {throughput:.2f} orders/hour")
-        # print(f"AMR hot swaps: {self.amr_hot_swaps}")
+        print(f"AMR Swap Count: {self.amr_swap_count}")
         print(f"Batch count: {self.batch_completion_count:.2f} batches")
         print(f"Flush Batch Size: {self.last_batch_size:.2f} orders")
         print(
@@ -564,7 +564,7 @@ class Simulation:
     def amr_return_leg(self, from_node, items_carried):
         return_dist = path_distance([from_node, self.staging], self.dist_map)
         return_time = return_dist / params.AMR_SPEED
-        unload_time = params.AMR_UNLOAD_TIME * items_carried
+        unload_time = params.AMR_AND_CART_UNLOAD_TIME * items_carried
         return return_dist, return_time, unload_time
 
     # Mark picker idle, record metrics for the completed batch, and schedule the next one if ready

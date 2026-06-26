@@ -103,17 +103,14 @@ class FollowSim(models.Simulation):
             r,c = node
             dist_traveled = self.dist_map[prev_node][r,c]
             time_cursor += dist_traveled / min(params.WALKING_SPEED, params.AMR_SPEED)
-
+            pick_duration = len(orders_at_node) * (params.HUMAN_PICK_TIME + params.CART_LOAD_TIME)
             if amr:
-                pick_duration = len(orders_at_node) * params.CART_LOAD_TIME
                 pick_duration += self.customer_collisions(
                     node, time_cursor, time_cursor + pick_duration
                 )
-            else:
-                pick_duration = len(orders_at_node) * params.HUMAN_PICK_TIME
             if pick_duration > 0:
                 time_cursor += pick_duration  # Update batch time every pick
-
+            print("time_cursor: ", time_cursor, node)
 
             seen_orders = {}
             for order in orders_at_node:  # Add all items at node to "seen orders"
@@ -138,7 +135,7 @@ class FollowSim(models.Simulation):
                     if coord == node
                 )
                 prev_node = node
-                if items_carried >= params.AMR_CAPACITY:
+                if items_carried >= params.AMR_AND_CART_CAPACITY:
                     # Full AMR heads back to staging to unload; doesn't block the picker
                     return_dist, return_time, unload_time = self.amr_return_leg(
                         node, items_carried
@@ -172,9 +169,11 @@ class FollowSim(models.Simulation):
         # Update walking distance of picker and global total
         picker.distance_walked += travel_distance
         self.metrics.human_distance += travel_distance
-        self.metrics.human_wait_for_amr += max(0, amr_travel_time - human_travel_time)
+        if amr:
+            self.metrics.human_wait_for_amr += max(0, amr_travel_time - human_travel_time)
         #self.metrics.human_idle += max(0, amr_travel_time - human_travel_time)
         finish_time = time_cursor
+        
 
         # order is not complete until entire batch is returned to staging
         for order in batch.orders:
@@ -190,11 +189,12 @@ class FollowSim(models.Simulation):
                 prev_node, items_carried
             )
             amr.distance_traveled += travel_distance
-            amr.available_time = time_cursor + return_time + unload_time
+            amr.available_time = finish_time + unload_time
             amr.mark_idle(amr.available_time)
             picker.available_time += unload_time # picker needs to be present for unloading 
             at_staging_time = max(finish_time, amr.available_time)
         self.metrics.batch_completion_count += 1
+        print(at_staging_time)
         self.schedule(at_staging_time, "PICK_COMPLETE", batch)
 
 
@@ -211,19 +211,50 @@ if __name__ == "__main__":
     raw_orders = generate_orders(
         coord_map, params.SIM_TIME, layout, params.order_arrival_rate
     )
+    orderZero = {
+        "visit_id": "88739",
+        "items": [
+        {"department": "Grocery", "quantity": 1},
+        {"department": "Perishable Grocery", "quantity": 1},
+        ],
+        "coords": [(7, 2), (1, 4)],
+        "arrival_time": 19.306187870727186,
+        "order_id": 0,
+        }
+    orderOne = {
+        "visit_id": "187612",
+        "items": [
+        {"department": "Fashion", "quantity": 1},
+        {"department": "Miscellaneous", "quantity": 1},
+        ],
+        "coords": [(4, 10), (7, 13)],
+        "arrival_time": 84.38360799705136,
+        "order_id": 1,
+        }
+    orderTwo = {
+        "visit_id": "62939",
+        "items": [
+        {"department": "Grocery", "quantity": 1},
+        {"department": "Home", "quantity": 1},
+        ],
+        "coords": [(5, 1), (7, 18)],
+        "arrival_time": 103.4150643467469,
+        "order_id": 2,
+        }
+    orderList = [orderZero, orderOne, orderTwo]
     orders = [
         models.Order(
-            id=raw_order["order_id"],
-            arrival_time=raw_order["arrival_time"],
-            due_time=raw_order["arrival_time"] + params.ORDER_DUE_TIME,
-            items=raw_order["items"],
-            coords=raw_order["coords"],
+            id=order["order_id"],
+            arrival_time=order["arrival_time"],
+            due_time=order["arrival_time"] + params.ORDER_DUE_TIME,
+            items=order["items"],
+            coords=order["coords"],
             is_perishable=any(
                 str(item.get("department", "")).lower().find("perishable") >= 0
-                for item in raw_order["items"]
+                for item in order["items"]
             ),
         )
-        for raw_order in raw_orders
+        for order in orderList
     ]
 
     pickers = [models.Picker(i, staging) for i in range(params.num_pickers)]

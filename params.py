@@ -4,7 +4,7 @@ import random
 
 num_pickers = 4 #default: 4 pickers
 num_robots = 4 #default: 4 AMRs
-num_customers = 30  # Representative of store congestion (default: 30 customers)
+num_customers = 0  # Representative of store congestion (default: 30 customers)
 order_arrival_rate = (
     1 / 450
 )  # Avg. orders per second for arrivalTimeGen's Poisson process (default:1/450sec{8 orders/hour}))
@@ -19,8 +19,8 @@ WALKING_SPEED = 1.3  # Walking speed in meters per second
 HUMAN_PICK_TIME = 20  # Time to find and manually pick one item at the pick location
 CART_LOAD_TIME = 5  # Seconds to load one item onto the cart/AMR
 # Simulated seconds to unload one item (Reflects reality: unloading totes at 6 items/1 tote/5 seconds)
-AMR_UNLOAD_TIME = 0.8  
-AMR_CAPACITY = 50  # Maximum AMR item capacity per trip
+AMR_AND_CART_UNLOAD_TIME = 0.8  
+AMR_AND_CART_CAPACITY = 50  # Maximum AMR and manual cart item capacity per trip
 AMR_SPEED = 1.5  # AMR speed in meters per second
 CUSTOMER_SPEED = 1  # customer speed in meters per second
 CUSTOMER_BROWSE_TIME = 30  # Time a customer spends at each item coord browsing

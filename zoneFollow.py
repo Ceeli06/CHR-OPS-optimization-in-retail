@@ -197,7 +197,7 @@ class ZoneFollow(models.Simulation):
                         1 for o in unique_orders.values() for c in o.coords if c == node
                     )
 
-                    if items_carried >= params.AMR_CAPACITY:
+                    if items_carried >= params.AMR_AND_CART_CAPACITY:
                         # Full AMR heads back to staging to unload; doesn't block the picker
                         return_dist, return_time, unload_time = self.amr_return_leg(
                             node, items_carried
@@ -248,7 +248,7 @@ class ZoneFollow(models.Simulation):
         )
 
         amr_finish_time += travel_dist / params.AMR_SPEED
-        amr_finish_time += params.AMR_UNLOAD_TIME * items_carried
+        amr_finish_time += params.AMR_AND_CART_UNLOAD_TIME * items_carried
         self.metrics.amr_distance += travel_dist
         amr.available_time = amr_finish_time
         amr.mark_idle(amr_finish_time)

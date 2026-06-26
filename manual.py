@@ -64,7 +64,7 @@ class ManualSim(models.Simulation):
         #)
 
         time_cursor = self.time #+ travel_time  # Holds time from batch start at initialization
-
+        item_count = 0
         # Map each location to the orders that have items there
         coord_orders = {}
         for order in batch.orders:
@@ -96,9 +96,10 @@ class ManualSim(models.Simulation):
             pick_duration = len(orders_at_node) * (
                 params.HUMAN_PICK_TIME + params.CART_LOAD_TIME
             )
+            
             if pick_duration > 0:
                 time_cursor += pick_duration  # Update batch time every pick
-
+            item_count += len(orders_at_node)
             seen_orders = {}
             for order in orders_at_node:  # Add all items at node to "seen orders"
                 seen_orders[id(order)] = order
@@ -113,6 +114,17 @@ class ManualSim(models.Simulation):
                     order.perishable_picked_at = time_cursor - pick_duration
                 decrement = sum(1 for coord in order.coords if coord == node)
                 order.items_remaining -= decrement  # Decrement items remaining in batch
+            # checks if cart capacity is exceeded
+            if item_count > params.AMR_AND_CART_CAPACITY:
+                # same human returns back to staging and goes back 
+                r,c = self.staging
+                dist_to_staging_and_back = 2 * self.dist_map[prevNode][r,c]
+                picker.distance_walked += dist_to_staging_and_back
+                time_cursor += dist_to_staging_and_back / params.WALKING_SPEED
+                time_cursor += params.AMR_AND_CART_UNLOAD_TIME * item_count #unload time
+                self.metrics.amr_swap_count += 1
+
+                item_count = 0
                 
         # accounts for time traveling from last node to staging
         r, c = self.staging
