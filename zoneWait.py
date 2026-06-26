@@ -4,7 +4,6 @@ from orderGen import generate_orders, convert_to_walkable
 from setup_layout import (
     setup_layout,
     map_of_coords,
-    get_path,
     all_distance_maps,
     path_distance,
 )
@@ -127,12 +126,10 @@ class ZoneWait(models.Simulation):
                 if not orders_at_node:
                     continue
 
-                if self.zoneFollow:
-                    pick_duration = len(orders_at_node) * params.CART_LOAD_TIME
-                else:
-                    pick_duration = len(orders_at_node) * (
-                        params.HUMAN_PICK_TIME + params.CART_LOAD_TIME
-                    )  # accounts for moving items to AMR @ end
+                pick_duration = len(orders_at_node) * (params.CART_LOAD_TIME + params.HUMAN_PICK_TIME)
+                pick_duration += self.customer_collisions(
+                        node, picker_time, picker_time + pick_duration
+                    )
 
                 picker_time += pick_duration
 
@@ -160,6 +157,7 @@ class ZoneWait(models.Simulation):
             picker_time += dist_last_to_zone_center / min(
                 params.WALKING_SPEED, params.AMR_SPEED
             )
+
 
             picker.available_time = picker_time
             picker_finish_times[zone_id] = picker_time
@@ -285,6 +283,40 @@ if __name__ == "__main__":
     raw_orders = generate_orders(
         coord_map, params.SIM_TIME, layout, params.order_arrival_rate
     )
+    orderZero = {
+    "visit_id": "88739",
+    "items": [
+    {"department": "Grocery", "quantity": 1},
+    {"department": "Perishable Grocery", "quantity": 1},
+    ],
+    "coords": [(7, 2), (1, 4)],
+    "arrival_time": 19.306187870727186,
+    "due_time": 2000,
+    "order_id": 0,
+    }
+    orderOne = {
+    "visit_id": "187612",
+    "items": [
+    {"department": "Fashion", "quantity": 1},
+    {"department": "Miscellaneous", "quantity": 1},
+    ],
+    "coords": [(4, 10), (7, 13)],
+    "arrival_time": 84.38360799705136,
+    "due_time": 2000,
+    "order_id": 1,
+    }
+    orderTwo = {
+    "visit_id": "62939",
+    "items": [
+    {"department": "Grocery", "quantity": 1},
+    {"department": "Home", "quantity": 1},
+    ],
+    "coords": [(5, 1), (7, 18)],
+    "arrival_time": 103.4150643467469,
+    "due_time": 2000,
+    "order_id": 2,
+    }
+    orderList = [orderZero, orderOne, orderTwo]
     orders = [
         models.Order(
             id=raw_order["order_id"],
@@ -297,7 +329,7 @@ if __name__ == "__main__":
                 for item in raw_order["items"]
             ),
         )
-        for raw_order in raw_orders
+        for raw_order in orderList
     ]
 
     pickers = [models.Picker(i, staging) for i in range(params.num_pickers)]
