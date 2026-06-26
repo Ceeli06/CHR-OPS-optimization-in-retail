@@ -128,7 +128,6 @@ class ZoneFollow(models.Simulation):
         
         for zone_id in sorted(route.keys(), reverse=True):
             zonePath = route[zone_id]
-            print(zonePath)
 
             picker = self.pickers[zone_id]
             r, c = zonePath[0]
@@ -191,7 +190,6 @@ class ZoneFollow(models.Simulation):
                         and node in order.perishable_coords
                     ):
                         order.perishable_picked_at = picker_time - pick_duration
-                        print("PERISHABLE PICKED AT: ", order.perishable_picked_at)
 
                     decrement = sum(1 for c in order.coords if c == node)
                     order.items_remaining -= decrement
@@ -281,40 +279,7 @@ if __name__ == "__main__":
     raw_orders = generate_orders(
         coord_map, params.SIM_TIME, layout, params.order_arrival_rate
     )
-    orderZero = {
-        "visit_id": "88739",
-        "items": [
-        {"department": "Grocery", "quantity": 1},
-        {"department": "Perishable Grocery", "quantity": 1},
-        ],
-        "coords": [(7, 2), (1, 4)],
-        "arrival_time": 19.306187870727186,
-        "due_time": 300,
-        "order_id": 0,
-        }
-    orderOne = {
-        "visit_id": "187612",
-        "items": [
-        {"department": "Fashion", "quantity": 1},
-        {"department": "Miscellaneous", "quantity": 1},
-        ],
-        "coords": [(4, 10), (7, 13)],
-        "arrival_time": 84.38360799705136,
-        "due_time": 300,
-        "order_id": 1,
-        }
-    orderTwo = {
-        "visit_id": "62939",
-        "items": [
-        {"department": "Grocery", "quantity": 1},
-        {"department": "Home", "quantity": 1},
-        ],
-        "coords": [(5, 1), (7, 18)],
-        "arrival_time": 103.4150643467469,
-        "due_time": 300,
-        "order_id": 2,
-    }
-    orderList = [orderZero, orderOne, orderTwo]
+    
     orders = [
         models.Order(
             id=raw_order["order_id"],
@@ -327,7 +292,7 @@ if __name__ == "__main__":
                 for item in raw_order["items"]
             ),
         )
-        for raw_order in orderList
+        for raw_order in raw_orders
     ]
 
     pickers = [models.Picker(i, staging) for i in range(params.num_pickers)]
