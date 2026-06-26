@@ -4,7 +4,6 @@ from orderGen import generate_orders
 from setup_layout import (
     setup_layout,
     map_of_coords,
-    get_path,
     path_distance,
     all_distance_maps,
 )
@@ -66,15 +65,13 @@ class FollowSim(models.Simulation):
         picker.mark_busy(self.time)
         if amr:
             amr.mark_busy(self.time)
-        self.metrics.batch_completion_count += 1
+        
         route = self.build_route_2(batch.orders)
         travel_distance = path_distance(route, self.dist_map)
         human_travel_time = travel_distance / params.WALKING_SPEED
         amr_travel_time = travel_distance / params.AMR_SPEED
 
-        time_cursor = self.time + max(
-            human_travel_time, amr_travel_time
-        )  # Holds time from batch start to end
+        time_cursor = self.time 
 
         # Map each location to the orders that have items there
         coord_orders = {}
@@ -91,7 +88,7 @@ class FollowSim(models.Simulation):
                 coord_orders.setdefault(coord, []).append(order)
 
         items_carried = 0
-        last_amr_node = self.staging
+        prev_node = self.staging
 
         # Walk the route, picking items and updating order state at each stop
         for node in route[
@@ -102,6 +99,11 @@ class FollowSim(models.Simulation):
             orders_at_node = coord_orders.get(node, [])
             if not orders_at_node:
                 continue
+
+            r,c = node
+            dist_traveled = self.dist_map[prev_node][r,c]
+            time_cursor += dist_traveled / min(params.WALKING_SPEED, params.AMR_SPEED)
+
             if amr:
                 pick_duration = len(orders_at_node) * params.CART_LOAD_TIME
                 pick_duration += self.customer_collisions(
@@ -111,6 +113,7 @@ class FollowSim(models.Simulation):
                 pick_duration = len(orders_at_node) * params.HUMAN_PICK_TIME
             if pick_duration > 0:
                 time_cursor += pick_duration  # Update batch time every pick
+
 
             seen_orders = {}
             for order in orders_at_node:  # Add all items at node to "seen orders"
@@ -134,8 +137,7 @@ class FollowSim(models.Simulation):
                     for coord in order.coords
                     if coord == node
                 )
-                last_amr_node = node
-
+                prev_node = node
                 if items_carried >= params.AMR_CAPACITY:
                     # Full AMR heads back to staging to unload; doesn't block the picker
                     return_dist, return_time, unload_time = self.amr_return_leg(
@@ -155,7 +157,7 @@ class FollowSim(models.Simulation):
                     )
                     time_cursor += swap_wait
                     self.metrics.human_wait_for_amr += swap_wait
-                    self.metrics.human_idle += swap_wait
+                    #self.metrics.human_idle += swap_wait
                     self.metrics.amr_distance += swap_dist
                     self.metrics.amr_swap_count += 1
 
@@ -163,11 +165,15 @@ class FollowSim(models.Simulation):
                     amr = replacement
                     items_carried = 0
 
+        # accounts for last item --> staging
+        r,c = self.staging
+        last_dist = dist_map[prev_node][r, c]
+        time_cursor += last_dist / min(params.WALKING_SPEED, params.AMR_SPEED) 
         # Update walking distance of picker and global total
         picker.distance_walked += travel_distance
         self.metrics.human_distance += travel_distance
         self.metrics.human_wait_for_amr += max(0, amr_travel_time - human_travel_time)
-        self.metrics.human_idle += max(0, amr_travel_time - human_travel_time)
+        #self.metrics.human_idle += max(0, amr_travel_time - human_travel_time)
         finish_time = time_cursor
 
         # order is not complete until entire batch is returned to staging
@@ -177,18 +183,19 @@ class FollowSim(models.Simulation):
 
         # Update picker available time; whichever AMR is currently active still has to
         # travel back to staging and unload before it's free for its next dispatch
-
         picker.available_time = finish_time
-        pick_complete_time = finish_time
+        at_staging_time = finish_time
         if amr:
             return_dist, return_time, unload_time = self.amr_return_leg(
-                last_amr_node, items_carried
+                prev_node, items_carried
             )
+            amr.distance_traveled += travel_distance
             amr.available_time = time_cursor + return_time + unload_time
             amr.mark_idle(amr.available_time)
-            self.metrics.amr_distance += return_dist
-            pick_complete_time = max(finish_time, amr.available_time)
-        self.schedule(pick_complete_time, "PICK_COMPLETE", batch)
+            picker.available_time += unload_time # picker needs to be present for unloading 
+            at_staging_time = max(finish_time, amr.available_time)
+        self.metrics.batch_completion_count += 1
+        self.schedule(at_staging_time, "PICK_COMPLETE", batch)
 
 
 # Main experimentation space where testing occurs

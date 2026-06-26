@@ -124,7 +124,7 @@ class ManualSim(models.Simulation):
 
         # Update picker avalible time and schedule a pick complete event
         finish_time = time_cursor
-
+        # missing unload time.
         picker.available_time = finish_time
         self.metrics.batch_completion_count += 1
         for order in batch.orders:

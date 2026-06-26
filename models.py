@@ -122,7 +122,6 @@ class Metrics:
         final_completion_time = (
             order.at_staging_time - order.arrival_time
         ) + params.STAGING_TIME
-        print("final_completion_time: ", final_completion_time)
         self.completion_times.append(final_completion_time)
 
         if final_completion_time > params.ORDER_DUE_TIME:
