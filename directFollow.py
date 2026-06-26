@@ -173,12 +173,6 @@ class FollowSim(models.Simulation):
         #self.metrics.human_idle += max(0, amr_travel_time - human_travel_time)
         finish_time = time_cursor
         
-
-        # order is not complete until entire batch is returned to staging
-        for order in batch.orders:
-            if order.items_remaining == 0 and order.at_staging_time is None:
-                order.at_staging_time = finish_time
-
         # Update picker available time; whichever AMR is currently active still has to
         # travel back to staging and unload before it's free for its next dispatch
         picker.available_time = finish_time
@@ -192,6 +186,11 @@ class FollowSim(models.Simulation):
             amr.mark_idle(amr.available_time)
             picker.available_time += unload_time # picker needs to be present for unloading 
             at_staging_time = max(finish_time, amr.available_time)
+            
+        # order is not complete until entire batch is returned to staging and unloaded
+        for order in batch.orders:
+            if order.items_remaining == 0 and order.at_staging_time is None:
+                order.at_staging_time = at_staging_time
         self.metrics.batch_completion_count += 1
         self.schedule(at_staging_time, "PICK_COMPLETE", batch)
 
