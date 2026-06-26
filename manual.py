@@ -130,6 +130,7 @@ class ManualSim(models.Simulation):
         r, c = self.staging
         dist_last_node_to_staging = dist_map[prevNode][r, c]
         time_cursor += dist_last_node_to_staging / (params.WALKING_SPEED * params.MANUAL_PUSH_FACTOR)
+        time_cursor += params.AMR_AND_CART_UNLOAD_TIME * item_count # unloading time @ end (picker must be present)
         # Update walking distance of picker and global total
         picker.distance_walked += total_travel_distance
         self.metrics.human_distance += total_travel_distance

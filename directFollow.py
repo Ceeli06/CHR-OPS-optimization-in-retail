@@ -108,9 +108,8 @@ class FollowSim(models.Simulation):
                 pick_duration += self.customer_collisions(
                     node, time_cursor, time_cursor + pick_duration
                 )
-            if pick_duration > 0:
-                time_cursor += pick_duration  # Update batch time every pick
-            print("time_cursor: ", time_cursor, node)
+
+            time_cursor += pick_duration  # Update batch time every pick
 
             seen_orders = {}
             for order in orders_at_node:  # Add all items at node to "seen orders"
@@ -194,7 +193,6 @@ class FollowSim(models.Simulation):
             picker.available_time += unload_time # picker needs to be present for unloading 
             at_staging_time = max(finish_time, amr.available_time)
         self.metrics.batch_completion_count += 1
-        print(at_staging_time)
         self.schedule(at_staging_time, "PICK_COMPLETE", batch)
 
 

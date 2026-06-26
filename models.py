@@ -123,6 +123,7 @@ class Metrics:
             order.at_staging_time - order.arrival_time
         ) + params.STAGING_TIME
         self.completion_times.append(final_completion_time)
+        print("LABUBU", order.id, final_completion_time)
 
         if final_completion_time > params.ORDER_DUE_TIME:
             self.late_orders += 1
@@ -156,6 +157,7 @@ class Metrics:
             if self.perishable_exposure
             else 0.0
         )
+
 
         spoiled_pct = (
             (self.spoiled_perishables / self.total_perishables) * 100
@@ -592,6 +594,9 @@ class Simulation:
                     start_time = order.arrival_time
                     
                 exposure = order.at_staging_time - start_time
+                print("exposure", exposure)
+                print(start_time)
+                print(order.at_staging_time)
                 item_count = self.perishable_item_count(order)
                 
                 
