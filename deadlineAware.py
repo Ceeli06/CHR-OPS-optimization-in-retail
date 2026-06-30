@@ -1,6 +1,6 @@
 import params
 import models
-from orderGen import generate_orders
+from orderGen import generate_orders, convert_to_walkable
 from setup_layout import (
     setup_layout,
     map_of_coords,
@@ -31,8 +31,6 @@ class DeadlineSim(models.Simulation):
             else:
                 non_urgent_orders.append(order)
 
-        print("urgent: ", urgent_orders)
-        print("non_urgent: ", non_urgent_orders)
         # Sort urgent orders by due time
         urgent_orders.sort(key=lambda o: o.due_time)
 
@@ -48,20 +46,16 @@ class DeadlineSim(models.Simulation):
             # Sort non_urgent_orders by due time so the closest deadline becomes our seed
             non_urgent_orders.sort(key=lambda o: o.due_time)
 
-            # Pop the oldest due order as our seed for Jaccard
+            # Pop the oldest due order 
             seed_order = non_urgent_orders.pop(0)
-            
             remaining_capacity -= 1
             
             total_intersection = self.department_set(seed_order)
             selected_orders.append(seed_order)
-            if len(selected_orders) > 1: # finds total_intersection if there are more orders in selected order
+            if len(selected_orders) > 1: # finds total_intersection if there are more orders in selected order for Jaccard
                 for i in selected_orders:
                     dept_next = self.department_set(i)
-                    print("next: ", dept_next)
-                    print("prev: ", total_intersection)
                     total_intersection = total_intersection | dept_next
-                    print("result: ", total_intersection)
             
      
             #seed_departments = super().department_set(seed_order)
@@ -159,8 +153,16 @@ class DeadlineSim(models.Simulation):
         meeting_point = self.staging
         # The meeting point of the picker and the AMR will be the first item
         # in the batch, which will be an item from the oldest order in the batch
-        if unique_coords:
-            meeting_point = unique_coords[0]
+        freezer_coords = self.map["2"]
+        walkable_freezer_coords = []
+        for coord in freezer_coords:
+            walkable_freezer_coords.append(convert_to_walkable(coord, self.layout))
+        
+        # makes sure that the meeting point chosen isn't a perishable item
+        for unique_coord in unique_coords:
+            if unique_coord not in walkable_freezer_coords:
+                meeting_point = unique_coord
+                break
 
         # Picker travels route starting at current location, while AMR always starts at staging
         picker_to_start_dist = path_distance(
@@ -290,7 +292,7 @@ class DeadlineSim(models.Simulation):
                     )
                     time_cursor += swap_wait
                     self.metrics.human_wait_for_amr += swap_wait
-                    self.metrics.human_idle += swap_wait
+                    #self.metrics.human_idle += swap_wait
                     self.metrics.amr_distance += swap_dist
                     self.metrics.amr_swap_count += 1
 
