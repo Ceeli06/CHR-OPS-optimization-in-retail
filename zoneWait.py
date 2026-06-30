@@ -14,7 +14,7 @@ import math
 # Main DES simulation, where time advances only when events occur (arrivals, dispatches, completions)
 class ZoneWait(models.Simulation):
     def __init__(
-        self, orders, pickers, amrs, coord_map, layout, staging=(0, 0), dist_map=None
+        self, orders, pickers, amrs, coord_map, layout, staging=(0, 0), dist_map=None, customers=None
     ):
         super().__init__(
             orders,
@@ -25,6 +25,7 @@ class ZoneWait(models.Simulation):
             False,
             staging=staging,
             dist_map=dist_map,
+            customers=customers
         )
 
         self.zoneMap = super().coordinate_zoning(layout, coord_map)
@@ -301,9 +302,10 @@ if __name__ == "__main__":
 
     pickers = [models.Picker(i, staging) for i in range(params.num_pickers)]
     amrs = [models.AMR(i, staging) for i in range(params.num_robots)]
+    customers = [models.Customer(i, staging) for i in range(params.num_customers)]
 
     sim = ZoneWait(
-        orders, pickers, amrs, coord_map, layout=layout, staging=staging, dist_map=dist_map
+        orders, pickers, amrs, coord_map, layout=layout, staging=staging, dist_map=dist_map, customers=customers
     )
     sim.coordinate_zoning(layout, coord_map)
     sim.run()

@@ -19,7 +19,7 @@ import math
 
 class ZoneDivided(models.Simulation):
     def __init__(
-        self, orders, pickers, amrs, coord_map, layout, staging=(0, 0), dist_map=None
+        self, orders, pickers, amrs, coord_map, layout, staging=(0, 0), dist_map=None, customers=None
     ):
         super().__init__(
             orders,
@@ -30,6 +30,7 @@ class ZoneDivided(models.Simulation):
             zoneFollow=False,
             staging=staging,
             dist_map=dist_map,
+            customers = customers
         )
 
         self.zoneMap = super().coordinate_zoning(layout, coord_map)
@@ -138,8 +139,7 @@ class ZoneDivided(models.Simulation):
                 )  
                 pick_duration += self.customer_collisions(
                         node, picker_time, picker_time + pick_duration
-                )
-
+                    )
                 picker_time += pick_duration
 
                 unique_orders = {id(o): o for o in orders_at_node}
@@ -296,8 +296,9 @@ if __name__ == "__main__":
 
     pickers = [models.Picker(i, staging) for i in range(params.num_pickers)]
     amrs = [models.AMR(i, staging) for i in range(params.num_robots)]
+    customers = [models.Customer(i, staging) for i in range(params.num_customers)]
 
     sim = ZoneDivided(
-        orders, pickers, amrs, coord_map, layout=layout, staging=staging, dist_map=dist_map
+        orders, pickers, amrs, coord_map, layout=layout, staging=staging, dist_map=dist_map, customers=customers
     )
     sim.run()

@@ -163,7 +163,8 @@ class DeadlineSim(models.Simulation):
             if unique_coord not in walkable_freezer_coords:
                 meeting_point = unique_coord
                 break
-
+        
+        
         # Picker travels route starting at current location, while AMR always starts at staging
         picker_to_start_dist = path_distance(
             [picker.location, meeting_point], self.dist_map
@@ -344,6 +345,40 @@ if __name__ == "__main__":
     raw_orders = generate_orders(
         coord_map, params.SIM_TIME, layout, params.order_arrival_rate
     )
+    orderZero = {
+    "visit_id": "88739",
+    "items": [
+    {"department": "Grocery", "quantity": 1},
+    {"department": "Perishable Grocery", "quantity": 1},
+    ],
+    "coords": [(7, 2), (1, 4)],
+    "arrival_time": 19.306187870727186,
+    "due_time": 22,
+    "order_id": 0,
+    }
+    orderOne = {
+    "visit_id": "187612",
+    "items": [
+    {"department": "Fashion", "quantity": 1},
+    {"department": "Miscellaneous", "quantity": 1},
+    ],
+    "coords": [(4, 10), (7, 13)],
+    "arrival_time": 84.38360799705136,
+    "due_time": 20213,
+    "order_id": 1,
+    }
+    orderTwo = {
+    "visit_id": "62939",
+    "items": [
+    {"department": "Grocery", "quantity": 1},
+    {"department": "Home", "quantity": 1},
+    ],
+    "coords": [(5, 1), (7, 18)],
+    "arrival_time": 103.4150643467469,
+    "due_time": 20,
+    "order_id": 2,
+    }
+    orderList = [orderZero, orderOne, orderTwo]
     orders = [
         models.Order(
             id=raw_order["order_id"],
@@ -356,7 +391,7 @@ if __name__ == "__main__":
                 for item in raw_order["items"]
             ),
         )
-        for raw_order in raw_orders
+        for raw_order in orderList
     ]
 
     pickers = [models.Picker(i, staging) for i in range(params.num_pickers)]
