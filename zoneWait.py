@@ -238,7 +238,7 @@ class ZoneWait(models.Simulation):
                     human_wait_time += amr_time - picker_finish
 
                 # Handoff/loading time
-                amr_time += params.CART_LOAD_TIME
+                amr_time += zone_items * params.CART_LOAD_TIME
                 items_carried += zone_items
 
             # Last zone to staging
