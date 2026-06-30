@@ -123,7 +123,7 @@ class Metrics:
             order.at_staging_time - order.arrival_time
         ) + params.STAGING_TIME
         self.completion_times.append(final_completion_time)
-        print("LABUBU", order.id, final_completion_time)
+        print("final_completion_time", order.id, final_completion_time)
 
         if final_completion_time > (order.due_time - order.arrival_time):
             self.late_orders += 1
@@ -513,7 +513,7 @@ class Simulation:
             dept_next = self.department_set(self.pending_orders[i])
             total_intersection = total_intersection | dept_next
 
-        # Greedily fill remaining slots via. Jaccard with orders most similar to the first order (seed)
+        # Greedily fill remaining slots via. Jaccard with orders most similar to what is alr included in the batch (seed)
         remaining_indices = [
             i for i in range(1, len(self.pending_orders)) if i not in selected_indices
         ]

@@ -31,6 +31,8 @@ class DeadlineSim(models.Simulation):
             else:
                 non_urgent_orders.append(order)
 
+        print("urgent: ", urgent_orders)
+        print("non_urgent: ", non_urgent_orders)
         # Sort urgent orders by due time
         urgent_orders.sort(key=lambda o: o.due_time)
 
@@ -48,15 +50,26 @@ class DeadlineSim(models.Simulation):
 
             # Pop the oldest due order as our seed for Jaccard
             seed_order = non_urgent_orders.pop(0)
-            selected_orders.append(seed_order)
+            
             remaining_capacity -= 1
-
-            seed_departments = super().department_set(seed_order)
+            
+            total_intersection = self.department_set(seed_order)
+            selected_orders.append(seed_order)
+            if len(selected_orders) > 1: # finds total_intersection if there are more orders in selected order
+                for i in selected_orders:
+                    dept_next = self.department_set(i)
+                    print("next: ", dept_next)
+                    print("prev: ", total_intersection)
+                    total_intersection = total_intersection | dept_next
+                    print("result: ", total_intersection)
+            
+     
+            #seed_departments = super().department_set(seed_order)
             # If we still have slots, sort the remaining non_urgent orders by similarity and append
             if remaining_capacity > 0 and non_urgent_orders:
                 non_urgent_orders.sort(
                     key=lambda o: (
-                        -self.order_similarity(seed_departments, o),
+                        -self.order_similarity(total_intersection, o),
                         o.due_time,
                     )
                 )
