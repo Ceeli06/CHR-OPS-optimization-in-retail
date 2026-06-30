@@ -136,6 +136,9 @@ class ZoneDivided(models.Simulation):
                 pick_duration = len(orders_at_node) * (
                     params.HUMAN_PICK_TIME + params.CART_LOAD_TIME
                 )  
+                pick_duration += self.customer_collisions(
+                        node, picker_time, picker_time + pick_duration
+                )
 
                 picker_time += pick_duration
 

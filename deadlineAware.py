@@ -185,7 +185,7 @@ class DeadlineSim(models.Simulation):
         # Calculate human wait time if they beat the robot to the zone
         human_wait = max(0.0, amr_arrival - picker_arrival)
         self.metrics.human_wait_for_amr += human_wait
-        self.metrics.human_idle += human_wait
+        #self.metrics.human_idle += human_wait
 
         # Calculate AMR wait time if it beat the human to the zone
         amr_wait = max(0.0, picker_arrival - amr_arrival)
