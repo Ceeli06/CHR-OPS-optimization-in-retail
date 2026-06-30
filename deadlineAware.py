@@ -1,5 +1,6 @@
 import params
 import models
+import sys
 from orderGen import generate_orders, convert_to_walkable
 from setup_layout import (
     setup_layout,
@@ -147,8 +148,10 @@ class DeadlineSim(models.Simulation):
             amr.mark_busy(self.time)
 
         all_coords = []
-        for order in batch.orders:
+        for order in reversed(batch.orders):
+            print(order.coords)
             all_coords.extend(order.coords)
+        
         unique_coords = list(dict.fromkeys(all_coords))
         meeting_point = self.staging
         # The meeting point of the picker and the AMR will be the first item
@@ -159,16 +162,29 @@ class DeadlineSim(models.Simulation):
             walkable_freezer_coords.append(convert_to_walkable(coord, self.layout))
         
         # makes sure that the meeting point chosen isn't a perishable item
-        for unique_coord in unique_coords:
-            if unique_coord not in walkable_freezer_coords:
-                meeting_point = unique_coord
-                break
-        
-        
+        #for unique_coord in unique_coords:
+        #    if unique_coord not in walkable_freezer_coords:
+        #        meeting_point = unique_coord
+        #        break
+        #print(unique_coords)
+        #print(meeting_point)
+        closest_item_to_staging = None
+        best_dist = sys.maxsize
+
+        for coord in unique_coords:
+            if coord not in freezer_coords:
+                r,c = coord
+                dist = self.dist_map[staging][r, c]
+                if dist < best_dist:
+                    best_dist = dist
+                    closest_item_to_staging = coord
+        print(closest_item_to_staging)
+        meeting_point = closest_item_to_staging
         # Picker travels route starting at current location, while AMR always starts at staging
         picker_to_start_dist = path_distance(
             [picker.location, meeting_point], self.dist_map
         )
+        
         amr_to_start_dist = 0.0
         if amr:
             amr_to_start_dist = path_distance(
