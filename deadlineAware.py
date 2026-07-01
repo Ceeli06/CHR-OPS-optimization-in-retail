@@ -152,9 +152,8 @@ class DeadlineSim(models.Simulation):
 
         all_coords = []
         for order in reversed(batch.orders):
-            print(order.coords)
             all_coords.extend(order.coords)
-        print("self time:", self.time)
+
         unique_coords = list(dict.fromkeys(all_coords))
         meeting_point = self.staging
         # The meeting point of the picker and the AMR will be the first item
@@ -164,13 +163,6 @@ class DeadlineSim(models.Simulation):
         for coord in freezer_coords:
             walkable_freezer_coords.append(convert_to_walkable(coord, self.layout))
 
-        # makes sure that the meeting point chosen isn't a perishable item
-        # for unique_coord in unique_coords:
-        #    if unique_coord not in walkable_freezer_coords:
-        #        meeting_point = unique_coord
-        #        break
-        # print(unique_coords)
-        # print(meeting_point)
         closest_item_to_staging = None
         best_dist = sys.maxsize
 
@@ -181,7 +173,7 @@ class DeadlineSim(models.Simulation):
                 if dist < best_dist:
                     best_dist = dist
                     closest_item_to_staging = coord
-        print(closest_item_to_staging)
+      
         meeting_point = closest_item_to_staging
         # Picker travels route starting at current location, while AMR always starts at staging
         picker_to_start_dist = path_distance(
@@ -217,14 +209,8 @@ class DeadlineSim(models.Simulation):
         route = self.build_decoupled_route(batch.orders, meeting_point)
         picking_distance = path_distance(route, self.dist_map)
 
-        human_picking_time = picking_distance / params.WALKING_SPEED
-        amr_picking_time = 0.0
-        if amr:
-            amr_picking_time = picking_distance / params.AMR_SPEED
-
         # Sync baseline before sequential pick durations are added
-        time_cursor = sync_start_time  # + max(human_picking_time, amr_picking_time)
-        print("TIME CURSOR: ", time_cursor)
+        time_cursor = sync_start_time  
 
         # Map each location to the orders that have items there
         coord_orders = {}
@@ -250,7 +236,7 @@ class DeadlineSim(models.Simulation):
             dist_to_node = self.dist_map[prev_node][r, c]
             prev_node = node
             time_cursor += dist_to_node / min(params.AMR_SPEED, params.WALKING_SPEED)
-            print(time_cursor, node)
+
             if node == self.staging:
                 break
             orders_at_node = coord_orders.get(node, [])
@@ -331,7 +317,6 @@ class DeadlineSim(models.Simulation):
             last_item_location  # Picker ends the order at the last item location
         )
         picker.available_time = time_cursor
-        print(picker.available_time, picker.id)
         picker.mark_idle(
             time_cursor
         )  # Picker is free the instant picking ends, not when the AMR later reaches staging

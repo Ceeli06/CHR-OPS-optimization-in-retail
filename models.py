@@ -598,9 +598,6 @@ class Simulation:
                     start_time = order.arrival_time
 
                 exposure = order.at_staging_time - start_time
-                print("exposure", exposure)
-                print(start_time)
-                print(order.at_staging_time)
                 item_count = self.perishable_item_count(order)
 
                 self.metrics.perishable_exposure.extend([exposure] * item_count)
