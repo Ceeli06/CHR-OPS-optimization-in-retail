@@ -135,7 +135,7 @@ class ZoneDivided(models.Simulation):
                 if node == self.staging:
                     break
                 walk_dist = self.dist_map[prev_node][node[0], node[1]]
-                walk_time = walk_dist / (params.WALKING_SPEED)
+                walk_time = walk_dist / (params.WALKING_SPEED * params.MANUAL_PUSH_FACTOR)
                 picker_time += walk_time
 
                 orders_at_node = coord_orders.get(node, [])
