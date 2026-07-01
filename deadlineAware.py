@@ -169,7 +169,7 @@ class DeadlineSim(models.Simulation):
         for coord in unique_coords:
             if coord not in freezer_coords:
                 r, c = coord
-                dist = self.dist_map[staging][r, c]
+                dist = self.dist_map[self.staging][r, c]
                 if dist < best_dist:
                     best_dist = dist
                     closest_item_to_staging = coord

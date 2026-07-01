@@ -1,4 +1,4 @@
-# Main dashboard: runs all 7 picking policies with adjustable parameters,
+# Main dashboard: runs all 6 picking policies with adjustable parameters,
 # compares their metrics, and visualizes a selected policy's routes over the store layout.
 
 import contextlib
@@ -42,7 +42,6 @@ from orderGen import generate_orders
 
 import manual
 import directFollow
-import shuttle2Staging
 import deadlineAware
 import zoneFollow
 import zoneWait
@@ -78,22 +77,6 @@ POLICIES = [
             dist_map=ctx.dist_map,
             customers=ctx.customers,
             layout=ctx.layout,
-        ),
-    },
-    {
-        "name": "Shuttle to Staging",
-        "uses_amr": True,
-        "patch_num_zones": True,
-        "route_method": "build_decoupled_route",
-        "build": lambda ctx: shuttle2Staging.ShuttleSim(
-            ctx.orders,
-            ctx.pickers,
-            ctx.amrs,
-            ctx.coord_map,
-            ctx.layout,
-            staging=ctx.staging,
-            dist_map=ctx.dist_map,
-            customers=ctx.customers,
         ),
     },
     {
@@ -300,9 +283,6 @@ def run_all_policies():
 
     results = {}
     for policy in POLICIES:
-        if policy.get("patch_num_zones"):
-            shuttle2Staging.ShuttleSim.num_zones = params.num_pickers
-
         ctx = build_run_context(layout, coord_map, dist_map, staging)
         sim = policy["build"](ctx)
         captured_routes = instrument_routes(sim, policy["route_method"])
@@ -339,7 +319,6 @@ ROUTE_ORDER_CMAP = LinearSegmentedColormap.from_list(
 ROUTE_LABELS = {
     "Manual": "Picker route",
     "Direct Follow": "Picker + AMR shared route",
-    "Shuttle to Staging": "Picker + AMR shared route",
     "Deadline Aware": "Picker + AMR shared route",
     "Zone Follow": "Picker + AMR shared route (per zone)",
     "Zone Wait": "Picker route per zone (AMR shuttles between zone handoff points)",
@@ -481,7 +460,7 @@ class SimDashboard(tk.Tk):
         params.order_arrival_rate = to_stored(values["order_arrival_rate"])
 
         self.run_button.config(state=tk.DISABLED)
-        self.status_var.set("Running all 7 policies...")
+        self.status_var.set("Running all 6 policies...")
 
         thread = threading.Thread(target=self._run_in_background, daemon=True)
         thread.start()
