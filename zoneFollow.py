@@ -1,10 +1,9 @@
 import params
 import models
-from orderGen import generate_orders, convert_to_walkable
+from orderGen import generate_orders
 from setup_layout import (
     setup_layout,
     map_of_coords,
-    get_path,
     all_distance_maps,
     path_distance,
 )
@@ -134,7 +133,7 @@ class ZoneFollow(models.Simulation):
             dist_to_next_zone = self.dist_map[prev_amr_coord][r, c]
             self.metrics.amr_distance += dist_to_next_zone
             amr_arrival_time = (dist_to_next_zone) / params.AMR_SPEED
-            # prev_amr_coord = self.handoffPoints[zone_id]
+            
             if len(zonePath) > 1:
                 prev_amr_coord = zonePath[-2]  # last item
 
@@ -230,7 +229,6 @@ class ZoneFollow(models.Simulation):
             )
             picker.available_time = picker_time
             picker_finish_times[zone_id] = picker_time
-            # amr_finished_picking_zone_time = picker_time
             picker.mark_idle(picker_time)
 
         amr_finish_time = amr_finished_picking_prev_zone_time
@@ -260,7 +258,7 @@ class ZoneFollow(models.Simulation):
 if __name__ == "__main__":
     layout = (
         setup_layout()
-    )  # Medium layout has all 16 departments, used as baseline before layout realism changes
+    )  
     coord_map = map_of_coords(layout)
     dist_map = all_distance_maps(layout)  # Precompute distances for routing
     staging = coord_map["S"][0]

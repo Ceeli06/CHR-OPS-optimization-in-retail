@@ -6,7 +6,7 @@
 
 import params
 import models
-from orderGen import generate_orders, convert_to_walkable
+from orderGen import generate_orders
 from setup_layout import (
     setup_layout,
     map_of_coords,
