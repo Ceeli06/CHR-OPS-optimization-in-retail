@@ -365,7 +365,6 @@ if __name__ == "__main__":
     raw_orders = generate_orders(
         coord_map, params.SIM_TIME, layout, params.order_arrival_rate
     )
-    print("RAW_ORDERS LENGTH:", len(raw_orders))
     orders = [
         models.Order(
             id=raw_order["order_id"],
