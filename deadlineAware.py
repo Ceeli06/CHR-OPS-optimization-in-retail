@@ -151,7 +151,7 @@ class DeadlineSim(models.Simulation):
         for order in reversed(batch.orders):
             print(order.coords)
             all_coords.extend(order.coords)
-        
+        print("self time:", self.time)
         unique_coords = list(dict.fromkeys(all_coords))
         meeting_point = self.staging
         # The meeting point of the picker and the AMR will be the first item
@@ -184,7 +184,7 @@ class DeadlineSim(models.Simulation):
         picker_to_start_dist = path_distance(
             [picker.location, meeting_point], self.dist_map
         )
-        
+
         amr_to_start_dist = 0.0
         if amr:
             amr_to_start_dist = path_distance(
@@ -221,7 +221,8 @@ class DeadlineSim(models.Simulation):
             amr_picking_time = picking_distance / params.AMR_SPEED
 
         # Sync baseline before sequential pick durations are added
-        time_cursor = sync_start_time + max(human_picking_time, amr_picking_time)
+        time_cursor = sync_start_time #+ max(human_picking_time, amr_picking_time)
+        print("TIME CURSOR: ", time_cursor)
 
         # Map each location to the orders that have items there
         coord_orders = {}
@@ -240,25 +241,29 @@ class DeadlineSim(models.Simulation):
         active_amr = amr
         items_carried = 0
         last_amr_node = meeting_point
-
+        prev_node = meeting_point
         # Walk the route, picking items and updating order state at each stop
-        for node in route:
+        for node in route[1:]:
+            r,c = node
+            dist_to_node = self.dist_map[prev_node][r,c]
+            prev_node = node
+            time_cursor += dist_to_node / min(params.AMR_SPEED, params.WALKING_SPEED)
+            print(time_cursor, node)
             if node == self.staging:
                 break
             orders_at_node = coord_orders.get(node, [])
             if not orders_at_node:
                 continue
-            if amr:
-                pick_duration = len(orders_at_node) * (
+
+            pick_duration = len(orders_at_node) * (
                     params.HUMAN_PICK_TIME + params.CART_LOAD_TIME
-                )
+            )
+            if amr:
+                
                 pick_duration += self.customer_collisions(
                     node, time_cursor, time_cursor + pick_duration
                 )
-            else:
-                pick_duration = len(orders_at_node) * (
-                    params.HUMAN_PICK_TIME + params.CART_LOAD_TIME
-                )
+            
             if pick_duration > 0:
                 time_cursor += pick_duration  # Update batch time every pick
 
@@ -325,10 +330,12 @@ class DeadlineSim(models.Simulation):
             last_item_location  # Picker ends the order at the last item location
         )
         picker.available_time = time_cursor
+        print(picker.available_time, picker.id)
         picker.mark_idle(
             time_cursor
         )  # Picker is free the instant picking ends, not when the AMR later reaches staging
 
+        
         total_human_distance = picker_to_start_dist + picking_distance
         picker.distance_walked += total_human_distance
         self.metrics.human_distance += total_human_distance
@@ -361,40 +368,7 @@ if __name__ == "__main__":
     raw_orders = generate_orders(
         coord_map, params.SIM_TIME, layout, params.order_arrival_rate
     )
-    orderZero = {
-    "visit_id": "88739",
-    "items": [
-    {"department": "Grocery", "quantity": 1},
-    {"department": "Perishable Grocery", "quantity": 1},
-    ],
-    "coords": [(7, 2), (1, 4)],
-    "arrival_time": 19.306187870727186,
-    "due_time": 22,
-    "order_id": 0,
-    }
-    orderOne = {
-    "visit_id": "187612",
-    "items": [
-    {"department": "Fashion", "quantity": 1},
-    {"department": "Miscellaneous", "quantity": 1},
-    ],
-    "coords": [(4, 10), (7, 13)],
-    "arrival_time": 84.38360799705136,
-    "due_time": 20213,
-    "order_id": 1,
-    }
-    orderTwo = {
-    "visit_id": "62939",
-    "items": [
-    {"department": "Grocery", "quantity": 1},
-    {"department": "Home", "quantity": 1},
-    ],
-    "coords": [(5, 1), (7, 18)],
-    "arrival_time": 103.4150643467469,
-    "due_time": 20,
-    "order_id": 2,
-    }
-    orderList = [orderZero, orderOne, orderTwo]
+    
     orders = [
         models.Order(
             id=raw_order["order_id"],
@@ -407,7 +381,7 @@ if __name__ == "__main__":
                 for item in raw_order["items"]
             ),
         )
-        for raw_order in orderList
+        for raw_order in raw_orders
     ]
 
     pickers = [models.Picker(i, staging) for i in range(params.num_pickers)]
