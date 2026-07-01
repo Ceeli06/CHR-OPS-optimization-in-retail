@@ -92,6 +92,7 @@ class FollowSim(models.Simulation):
 
         items_carried = 0
         prev_node = self.staging
+        swap_occurred = False
 
         # Walk the route, picking items and updating order state at each stop
         for node in route[
@@ -160,6 +161,7 @@ class FollowSim(models.Simulation):
                     self.metrics.human_wait_for_amr += swap_wait
                     self.metrics.amr_distance += swap_dist
                     self.metrics.cart_swap_count += 1
+                    swap_occurred = True
 
                     replacement.mark_busy(time_cursor)
                     amr = replacement
@@ -173,9 +175,10 @@ class FollowSim(models.Simulation):
         picker.distance_walked += travel_distance
         self.metrics.human_distance += travel_distance
         if amr:
-            self.metrics.human_wait_for_amr += max(
-                0, amr_travel_time - human_travel_time
-            )
+            if not swap_occurred:
+                self.metrics.human_wait_for_amr += max(
+                    0, amr_travel_time - human_travel_time
+                )
             self.metrics.amr_wait_for_human += max(
                 0, human_travel_time - amr_travel_time
             )

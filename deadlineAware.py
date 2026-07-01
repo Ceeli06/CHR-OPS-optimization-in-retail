@@ -279,7 +279,9 @@ class DeadlineSim(models.Simulation):
                 )
                 last_amr_node = node
 
-                if items_carried >= params.CART_CAPACITY:
+                if items_carried >= params.CART_CAPACITY and any(
+                    order.items_remaining > 0 for order in batch.orders
+                ):
                     # Full AMR heads back to staging to unload (doesn't block the picker)
                     return_dist, return_time, unload_time = self.amr_return_leg(
                         node, items_carried
