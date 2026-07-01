@@ -106,6 +106,7 @@ class FollowSim(models.Simulation):
 
             r, c = node
             dist_traveled = self.dist_map[prev_node][r, c]
+            prev_node = node
             time_cursor += dist_traveled / min(params.WALKING_SPEED, params.AMR_SPEED)
             pick_duration = len(orders_at_node) * (
                 params.HUMAN_PICK_TIME + params.CART_LOAD_TIME
@@ -139,7 +140,6 @@ class FollowSim(models.Simulation):
                     for coord in order.coords
                     if coord == node
                 )
-                prev_node = node
                 if items_carried >= params.CART_CAPACITY:
                     # Full AMR heads back to staging to unload; doesn't block the picker
                     return_dist, return_time, unload_time = self.amr_return_leg(

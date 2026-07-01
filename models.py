@@ -145,7 +145,7 @@ class Metrics:
         late_pct = (
             (self.late_orders / self.total_orders) * 100 if self.total_orders else 0.0
         )
-        throughput = self.total_orders / (sim_time / 3600) if sim_time > 0 else 0.0
+        throughput = self.total_orders / (self.total_time_to_finish / 3600) if sim_time > 0 else 0.0
 
         # AMR utilization (ignored for manual policy since AMR not used)
         amr_util = (

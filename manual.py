@@ -101,7 +101,7 @@ class ManualSim(models.Simulation):
 
             if pick_duration > 0:
                 time_cursor += pick_duration  # Update batch time every pick
-            item_count += len(orders_at_node)
+            
             seen_orders = {}
             for order in orders_at_node:  # Add all items at node to "seen orders"
                 seen_orders[id(order)] = order
@@ -117,6 +117,12 @@ class ManualSim(models.Simulation):
                 decrement = sum(1 for coord in order.coords if coord == node)
                 order.items_remaining -= decrement  # Decrement items remaining in batch
             # Checks if cart capacity is exceeded
+            item_count += sum(
+                    1
+                    for order in orders_at_node
+                    for coord in order.coords
+                    if coord == node
+                )
             if item_count > params.CART_CAPACITY:
                 # Same human returns back to staging and goes back if the cart capacity is exceeded
                 r, c = self.staging
