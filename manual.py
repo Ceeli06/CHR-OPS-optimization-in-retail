@@ -124,7 +124,7 @@ class ManualSim(models.Simulation):
                 picker.distance_walked += dist_to_staging_and_back
                 time_cursor += dist_to_staging_and_back / params.WALKING_SPEED
                 time_cursor += params.CART_UNLOAD_TIME * item_count  # Unload time
-                self.metrics.amr_swap_count += 1
+                self.metrics.cart_swap_count += 1
 
                 item_count = 0
 

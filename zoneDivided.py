@@ -237,7 +237,7 @@ class ZoneDivided(models.Simulation):
                     last_delivery_time = delivery_time
                     amr_distance_total += to_zone_dist + back_dist
                     if num_trips > 1:
-                        self.metrics.amr_swap_count += 1
+                        self.metrics.cart_swap_count += 1
 
                 zone_delivery_time[zone_id] = last_delivery_time
                 # Picker is occupied until the AMR finishes taking ALL items from the Zone's batch

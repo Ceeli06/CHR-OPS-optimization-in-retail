@@ -212,7 +212,7 @@ class ZoneFollow(models.Simulation):
                         picker_time += swap_wait
                         human_wait_for_amr += swap_wait
                         self.metrics.amr_distance += swap_dist
-                        self.metrics.amr_swap_count += 1
+                        self.metrics.cart_swap_count += 1
 
                         replacement.mark_busy(picker_time)
                         amr = replacement

@@ -112,7 +112,7 @@ class Metrics:
         self.total_perishables = 0
         self.human_wait_for_amr = 0.0
         self.amr_wait_for_human = 0.0
-        self.amr_swap_count = 0
+        self.cart_swap_count = 0
         self.batch_completion_count = 0
         self.last_batch_size = 0
         self.total_time_to_finish = 0
@@ -211,7 +211,7 @@ class Metrics:
         print(f"Avg perishable exposure time: {avg_exposure/60:.2f} min")
         print(f"Spoiled perishables: {spoiled_pct:.2f}%")
         print(f"Throughput: {throughput:.2f} orders/hour")
-        print(f"AMR Swap Count: {self.amr_swap_count}")
+        print(f"AMR Swap Count: {self.cart_swap_count}")
         print(f"Batch count: {self.batch_completion_count:.2f} batches")
         print(f"Flush Batch Size: {self.last_batch_size:.2f} orders")
         print(

@@ -221,7 +221,7 @@ class ZoneWait(models.Simulation):
                     amr_time += swap_wait
                     human_wait_time += swap_wait
                     self.metrics.amr_distance += swap_dist
-                    self.metrics.amr_swap_count += 1
+                    self.metrics.cart_swap_count += 1
 
                     replacement.mark_busy(amr_time)
                     active_amr = replacement
