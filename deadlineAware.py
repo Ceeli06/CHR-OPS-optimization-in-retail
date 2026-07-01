@@ -47,19 +47,20 @@ class DeadlineSim(models.Simulation):
             # Sort non_urgent_orders by due time so the closest deadline becomes our seed
             non_urgent_orders.sort(key=lambda o: o.due_time)
 
-            # Pop the oldest due order 
+            # Pop the oldest due order
             seed_order = non_urgent_orders.pop(0)
             remaining_capacity -= 1
-            
+
             total_intersection = self.department_set(seed_order)
             selected_orders.append(seed_order)
-            if len(selected_orders) > 1: # finds total_intersection if there are more orders in selected order for Jaccard
+            if (
+                len(selected_orders) > 1
+            ):  # finds total_intersection if there are more orders in selected order for Jaccard
                 for i in selected_orders:
                     dept_next = self.department_set(i)
                     total_intersection = total_intersection | dept_next
-            
-     
-            #seed_departments = super().department_set(seed_order)
+
+            # seed_departments = super().department_set(seed_order)
             # If we still have slots, sort the remaining non_urgent orders by similarity and append
             if remaining_capacity > 0 and non_urgent_orders:
                 non_urgent_orders.sort(
@@ -103,7 +104,9 @@ class DeadlineSim(models.Simulation):
             return [start_node]
 
         # New route starts directly from current location for pickers or from staging for amrs
-        route = get_path(unique_coords, self.dist_map, start_node, self.map, self.layout)
+        route = get_path(
+            unique_coords, self.dist_map, start_node, self.map, self.layout
+        )
         return route[:-1]
 
     # Main order handling function which routes a batch, computes pick times, and schedules its completion
@@ -160,20 +163,20 @@ class DeadlineSim(models.Simulation):
         walkable_freezer_coords = []
         for coord in freezer_coords:
             walkable_freezer_coords.append(convert_to_walkable(coord, self.layout))
-        
+
         # makes sure that the meeting point chosen isn't a perishable item
-        #for unique_coord in unique_coords:
+        # for unique_coord in unique_coords:
         #    if unique_coord not in walkable_freezer_coords:
         #        meeting_point = unique_coord
         #        break
-        #print(unique_coords)
-        #print(meeting_point)
+        # print(unique_coords)
+        # print(meeting_point)
         closest_item_to_staging = None
         best_dist = sys.maxsize
 
         for coord in unique_coords:
             if coord not in freezer_coords:
-                r,c = coord
+                r, c = coord
                 dist = self.dist_map[staging][r, c]
                 if dist < best_dist:
                     best_dist = dist
@@ -202,7 +205,7 @@ class DeadlineSim(models.Simulation):
         # Calculate human wait time if they beat the robot to the zone
         human_wait = max(0.0, amr_arrival - picker_arrival)
         self.metrics.human_wait_for_amr += human_wait
-        #self.metrics.human_idle += human_wait
+        # self.metrics.human_idle += human_wait
 
         # Calculate AMR wait time if it beat the human to the zone
         amr_wait = max(0.0, picker_arrival - amr_arrival)
@@ -221,7 +224,7 @@ class DeadlineSim(models.Simulation):
             amr_picking_time = picking_distance / params.AMR_SPEED
 
         # Sync baseline before sequential pick durations are added
-        time_cursor = sync_start_time #+ max(human_picking_time, amr_picking_time)
+        time_cursor = sync_start_time  # + max(human_picking_time, amr_picking_time)
         print("TIME CURSOR: ", time_cursor)
 
         # Map each location to the orders that have items there
@@ -244,8 +247,8 @@ class DeadlineSim(models.Simulation):
         prev_node = meeting_point
         # Walk the route, picking items and updating order state at each stop
         for node in route[1:]:
-            r,c = node
-            dist_to_node = self.dist_map[prev_node][r,c]
+            r, c = node
+            dist_to_node = self.dist_map[prev_node][r, c]
             prev_node = node
             time_cursor += dist_to_node / min(params.AMR_SPEED, params.WALKING_SPEED)
             print(time_cursor, node)
@@ -256,14 +259,14 @@ class DeadlineSim(models.Simulation):
                 continue
 
             pick_duration = len(orders_at_node) * (
-                    params.HUMAN_PICK_TIME + params.CART_LOAD_TIME
+                params.HUMAN_PICK_TIME + params.CART_LOAD_TIME
             )
             if amr:
-                
+
                 pick_duration += self.customer_collisions(
                     node, time_cursor, time_cursor + pick_duration
                 )
-            
+
             if pick_duration > 0:
                 time_cursor += pick_duration  # Update batch time every pick
 
@@ -314,7 +317,7 @@ class DeadlineSim(models.Simulation):
                     )
                     time_cursor += swap_wait
                     self.metrics.human_wait_for_amr += swap_wait
-                    #self.metrics.human_idle += swap_wait
+                    # self.metrics.human_idle += swap_wait
                     self.metrics.amr_distance += swap_dist
                     self.metrics.amr_swap_count += 1
 
@@ -335,7 +338,6 @@ class DeadlineSim(models.Simulation):
             time_cursor
         )  # Picker is free the instant picking ends, not when the AMR later reaches staging
 
-        
         total_human_distance = picker_to_start_dist + picking_distance
         picker.distance_walked += total_human_distance
         self.metrics.human_distance += total_human_distance
@@ -368,7 +370,7 @@ if __name__ == "__main__":
     raw_orders = generate_orders(
         coord_map, params.SIM_TIME, layout, params.order_arrival_rate
     )
-    
+
     orders = [
         models.Order(
             id=raw_order["order_id"],

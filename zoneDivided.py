@@ -19,7 +19,15 @@ import math
 
 class ZoneDivided(models.Simulation):
     def __init__(
-        self, orders, pickers, amrs, coord_map, layout, staging=(0, 0), dist_map=None, customers=None
+        self,
+        orders,
+        pickers,
+        amrs,
+        coord_map,
+        layout,
+        staging=(0, 0),
+        dist_map=None,
+        customers=None,
     ):
         super().__init__(
             orders,
@@ -30,7 +38,7 @@ class ZoneDivided(models.Simulation):
             zoneFollow=False,
             staging=staging,
             dist_map=dist_map,
-            customers = customers
+            customers=customers,
         )
 
         self.zoneMap = super().coordinate_zoning(layout, coord_map)
@@ -121,7 +129,7 @@ class ZoneDivided(models.Simulation):
             picker_time = start_time
 
             picker.mark_busy(start_time)
-            prev_node = zonePath[0] # Picker starts at the handoff point
+            prev_node = zonePath[0]  # Picker starts at the handoff point
 
             for node in zonePath[1:-1]:
                 if node == self.staging:
@@ -133,13 +141,13 @@ class ZoneDivided(models.Simulation):
                 orders_at_node = coord_orders.get(node, [])
                 if not orders_at_node:
                     continue
-                
+
                 pick_duration = len(orders_at_node) * (
                     params.HUMAN_PICK_TIME + params.CART_LOAD_TIME
-                )  
+                )
                 pick_duration += self.customer_collisions(
-                        node, picker_time, picker_time + pick_duration
-                    )
+                    node, picker_time, picker_time + pick_duration
+                )
                 picker_time += pick_duration
 
                 unique_orders = {id(o): o for o in orders_at_node}
@@ -163,9 +171,9 @@ class ZoneDivided(models.Simulation):
             r, c = self.handoffPoints[zone_id]
             dist_last_to_zone_center = self.dist_map[prev_node][r, c]
             picker_time += dist_last_to_zone_center / params.WALKING_SPEED
-            #picker.available_time = picker_time
+            # picker.available_time = picker_time
             picker_finish_times[zone_id] = picker_time
-            #picker.mark_idle(picker_time)
+            # picker.mark_idle(picker_time)
         # times when the order is at the handoff point
         zone_delivery_time = {}
         amr_wait_time = 0.0
@@ -180,7 +188,9 @@ class ZoneDivided(models.Simulation):
             for zone_id in sorted(route.keys(), key=lambda z: picker_finish_times[z]):
                 picker_finish = picker_finish_times[zone_id]
                 zone_item_count = len(batch.zoned_orders[zone_id])
-                num_trips = max(1, math.ceil(zone_item_count / params.AMR_AND_CART_CAPACITY))
+                num_trips = max(
+                    1, math.ceil(zone_item_count / params.AMR_AND_CART_CAPACITY)
+                )
 
                 # Split items as evenly as possible across the trips needed to stay under capacity
                 base, extra = divmod(zone_item_count, num_trips)
@@ -191,7 +201,6 @@ class ZoneDivided(models.Simulation):
                 for trip_idx, trip_items in enumerate(trip_sizes):
                     amr_id = min(tentative_available, key=tentative_available.get)
                     zone_amr = amr_by_id[amr_id]
-                    
 
                     departure = max(tentative_available[amr_id], self.time)
                     zone_amr.mark_busy(departure)
@@ -207,13 +216,13 @@ class ZoneDivided(models.Simulation):
 
                     if arrival < ready_time:
                         amr_wait_time += ready_time - arrival
-                        #zone_amr.mark_idle(arrival)
-                        #zone_amr.mark_busy(ready_time)
+                        # zone_amr.mark_idle(arrival)
+                        # zone_amr.mark_busy(ready_time)
                     else:
                         human_wait_time += arrival - ready_time
 
                     pickup_time = max(arrival, ready_time)
-                    
+
                     loaded_time = pickup_time + params.CART_LOAD_TIME * trip_items
                     last_pickup_time = loaded_time
 
@@ -237,10 +246,10 @@ class ZoneDivided(models.Simulation):
                 zone_delivery_time[zone_id] = last_delivery_time
                 # Picker is occupied until the AMR finishes taking ALL items from the Zone's batch
                 picker = self.pickers[zone_id]
-                free_time = last_pickup_time 
+                free_time = last_pickup_time
                 picker.available_time = free_time
                 picker.mark_idle(free_time)
-                
+
         else:
             for zone_id in route.keys():
                 zone_delivery_time[zone_id] = picker_finish_times[zone_id]
@@ -252,7 +261,7 @@ class ZoneDivided(models.Simulation):
         self.metrics.human_distance += human_travel_distance
         self.metrics.amr_distance += amr_distance_total
         self.metrics.human_wait_for_amr += human_wait_time
-        #self.metrics.human_idle += human_wait_time
+        # self.metrics.human_idle += human_wait_time
         # An order isn't complete until every zone it touched has delivered its portion
         for order in batch.orders:
             if order.items_remaining <= 0 and order.at_staging_time is None:
@@ -278,7 +287,7 @@ if __name__ == "__main__":
     raw_orders = generate_orders(
         coord_map, params.SIM_TIME, layout, params.order_arrival_rate
     )
-    
+
     orders = [
         models.Order(
             id=raw_order["order_id"],
@@ -299,6 +308,13 @@ if __name__ == "__main__":
     customers = [models.Customer(i, staging) for i in range(params.num_customers)]
 
     sim = ZoneDivided(
-        orders, pickers, amrs, coord_map, layout=layout, staging=staging, dist_map=dist_map, customers=customers
+        orders,
+        pickers,
+        amrs,
+        coord_map,
+        layout=layout,
+        staging=staging,
+        dist_map=dist_map,
+        customers=customers,
     )
     sim.run()

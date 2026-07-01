@@ -154,10 +154,11 @@ def zone_amr_dist(zonePath, dist_map, staging):
 
 def get_path(orders, dist_map, staging, map, layout):
     from orderGen import convert_to_walkable
+
     perishables = []
     non_perishables = []
     walkable_freezer_coords = []
-    freezer_coords = map['2']
+    freezer_coords = map["2"]
     for coord in freezer_coords:
         converted_coord = convert_to_walkable(coord, layout)
         walkable_freezer_coords.append(converted_coord)
@@ -167,7 +168,6 @@ def get_path(orders, dist_map, staging, map, layout):
             perishables.append(order)
         else:
             non_perishables.append(order)
-    
 
     front = nearest_neighbor(non_perishables, dist_map, staging)
     end = nearest_neighbor(perishables, dist_map, front[-1])

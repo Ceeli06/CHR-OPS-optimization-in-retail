@@ -121,7 +121,9 @@ class ShuttleSim(models.Simulation):
         if not unique_coords:
             return [start_node]
 
-        route = get_path(unique_coords, self.dist_map, start_node, self.map, self.layout)
+        route = get_path(
+            unique_coords, self.dist_map, start_node, self.map, self.layout
+        )
         return route[:-1]
 
     # Main order handling function which routes a batch, computes pick times, and schedules its

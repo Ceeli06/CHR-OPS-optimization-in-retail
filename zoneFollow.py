@@ -125,18 +125,18 @@ class ZoneFollow(models.Simulation):
         human_wait_for_amr = 0
         amr_finished_picking_prev_zone_time = max(amr.available_time, self.time)
         items_carried = 0
-        
+
         for zone_id in sorted(route.keys(), reverse=True):
             zonePath = route[zone_id]
 
             picker = self.pickers[zone_id]
             r, c = zonePath[0]
             dist_to_next_zone = self.dist_map[prev_amr_coord][r, c]
-            self.metrics.amr_distance+=dist_to_next_zone
+            self.metrics.amr_distance += dist_to_next_zone
             amr_arrival_time = (dist_to_next_zone) / params.AMR_SPEED
-            #prev_amr_coord = self.handoffPoints[zone_id]
+            # prev_amr_coord = self.handoffPoints[zone_id]
             if len(zonePath) > 1:
-                prev_amr_coord = zonePath[-2] #last item
+                prev_amr_coord = zonePath[-2]  # last item
 
             picker_ready = picker.available_time
             amr_ready = amr_finished_picking_prev_zone_time + amr_arrival_time
@@ -147,7 +147,7 @@ class ZoneFollow(models.Simulation):
             picker_time = start_time
 
             # calculates amr idle time automatically
-            #if amr_wait_time > 0 and amr:
+            # if amr_wait_time > 0 and amr:
             #    amr.mark_idle(amr_ready)
             #    amr.mark_busy(start_time)
 
@@ -158,7 +158,7 @@ class ZoneFollow(models.Simulation):
                 if node == self.staging:
                     break
                 walk_dist = self.dist_map[prev_node][node[0], node[1]]
-                self.metrics.amr_distance+=walk_dist
+                self.metrics.amr_distance += walk_dist
                 walk_time = walk_dist / (min(params.WALKING_SPEED, params.AMR_SPEED))
                 picker_time += walk_time
 
@@ -167,16 +167,14 @@ class ZoneFollow(models.Simulation):
                     continue
 
                 pick_duration = len(orders_at_node) * (
-                        params.HUMAN_PICK_TIME + params.CART_LOAD_TIME
-                    )
-                
+                    params.HUMAN_PICK_TIME + params.CART_LOAD_TIME
+                )
+
                 pick_duration += self.customer_collisions(
-                        node, picker_time, picker_time + pick_duration
-                    )
-                
+                    node, picker_time, picker_time + pick_duration
+                )
 
                 picker_time += pick_duration
-                
 
                 unique_orders = {id(o): o for o in orders_at_node}
 
@@ -230,22 +228,20 @@ class ZoneFollow(models.Simulation):
 
             # walking from last picking point to handoff point for picker
             r, c = self.handoffPoints[zone_id]
-            amr_finished_picking_prev_zone_time = picker_time #amr doesn't walk back to staging, instead moves directly to next zone
+            amr_finished_picking_prev_zone_time = picker_time  # amr doesn't walk back to staging, instead moves directly to next zone
             dist_last_to_zone_center = self.dist_map[prev_node][r, c]
             picker_time += dist_last_to_zone_center / min(
                 params.WALKING_SPEED, params.AMR_SPEED
             )
             picker.available_time = picker_time
             picker_finish_times[zone_id] = picker_time
-            #amr_finished_picking_zone_time = picker_time
+            # amr_finished_picking_zone_time = picker_time
             picker.mark_idle(picker_time)
 
         amr_finish_time = amr_finished_picking_prev_zone_time
         # Last zone -> staging
 
-        travel_dist = path_distance(
-            [prev_amr_coord, self.staging], self.dist_map
-        )
+        travel_dist = path_distance([prev_amr_coord, self.staging], self.dist_map)
 
         amr_finish_time += travel_dist / params.AMR_SPEED
         amr_finish_time += params.AMR_AND_CART_UNLOAD_TIME * items_carried
@@ -279,7 +275,7 @@ if __name__ == "__main__":
     raw_orders = generate_orders(
         coord_map, params.SIM_TIME, layout, params.order_arrival_rate
     )
-    
+
     orders = [
         models.Order(
             id=raw_order["order_id"],

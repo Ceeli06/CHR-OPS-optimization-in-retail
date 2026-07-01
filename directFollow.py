@@ -65,13 +65,13 @@ class FollowSim(models.Simulation):
         picker.mark_busy(self.time)
         if amr:
             amr.mark_busy(self.time)
-        
+
         route = self.build_route_2(batch.orders)
         travel_distance = path_distance(route, self.dist_map)
         human_travel_time = travel_distance / params.WALKING_SPEED
         amr_travel_time = travel_distance / params.AMR_SPEED
 
-        time_cursor = self.time 
+        time_cursor = self.time
 
         # Map each location to the orders that have items there
         coord_orders = {}
@@ -100,10 +100,12 @@ class FollowSim(models.Simulation):
             if not orders_at_node:
                 continue
 
-            r,c = node
-            dist_traveled = self.dist_map[prev_node][r,c]
+            r, c = node
+            dist_traveled = self.dist_map[prev_node][r, c]
             time_cursor += dist_traveled / min(params.WALKING_SPEED, params.AMR_SPEED)
-            pick_duration = len(orders_at_node) * (params.HUMAN_PICK_TIME + params.CART_LOAD_TIME)
+            pick_duration = len(orders_at_node) * (
+                params.HUMAN_PICK_TIME + params.CART_LOAD_TIME
+            )
             if amr:
                 pick_duration += self.customer_collisions(
                     node, time_cursor, time_cursor + pick_duration
@@ -153,7 +155,7 @@ class FollowSim(models.Simulation):
                     )
                     time_cursor += swap_wait
                     self.metrics.human_wait_for_amr += swap_wait
-                    #self.metrics.human_idle += swap_wait
+                    # self.metrics.human_idle += swap_wait
                     self.metrics.amr_distance += swap_dist
                     self.metrics.amr_swap_count += 1
 
@@ -162,17 +164,19 @@ class FollowSim(models.Simulation):
                     items_carried = 0
 
         # accounts for last item --> staging
-        r,c = self.staging
+        r, c = self.staging
         last_dist = self.dist_map[prev_node][r, c]
-        time_cursor += last_dist / min(params.WALKING_SPEED, params.AMR_SPEED) 
+        time_cursor += last_dist / min(params.WALKING_SPEED, params.AMR_SPEED)
         # Update walking distance of picker and global total
         picker.distance_walked += travel_distance
         self.metrics.human_distance += travel_distance
         if amr:
-            self.metrics.human_wait_for_amr += max(0, amr_travel_time - human_travel_time)
-        #self.metrics.human_idle += max(0, amr_travel_time - human_travel_time)
+            self.metrics.human_wait_for_amr += max(
+                0, amr_travel_time - human_travel_time
+            )
+        # self.metrics.human_idle += max(0, amr_travel_time - human_travel_time)
         finish_time = time_cursor
-        
+
         # Update picker available time; whichever AMR is currently active still has to
         # travel back to staging and unload before it's free for its next dispatch
         picker.available_time = finish_time
@@ -184,9 +188,11 @@ class FollowSim(models.Simulation):
             amr.distance_traveled += travel_distance
             amr.available_time = finish_time + unload_time
             amr.mark_idle(amr.available_time)
-            picker.available_time += unload_time # picker needs to be present for unloading 
+            picker.available_time += (
+                unload_time  # picker needs to be present for unloading
+            )
             at_staging_time = max(finish_time, amr.available_time)
-            
+
         # order is not complete until entire batch is returned to staging and unloaded
         for order in batch.orders:
             if order.items_remaining == 0 and order.at_staging_time is None:
@@ -208,7 +214,7 @@ if __name__ == "__main__":
     raw_orders = generate_orders(
         coord_map, params.SIM_TIME, layout, params.order_arrival_rate
     )
-    
+
     orders = [
         models.Order(
             id=raw_order["order_id"],

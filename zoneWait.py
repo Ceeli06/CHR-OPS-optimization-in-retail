@@ -14,7 +14,15 @@ import math
 # Main DES simulation, where time advances only when events occur (arrivals, dispatches, completions)
 class ZoneWait(models.Simulation):
     def __init__(
-        self, orders, pickers, amrs, coord_map, layout, staging=(0, 0), dist_map=None, customers=None
+        self,
+        orders,
+        pickers,
+        amrs,
+        coord_map,
+        layout,
+        staging=(0, 0),
+        dist_map=None,
+        customers=None,
     ):
         super().__init__(
             orders,
@@ -25,7 +33,7 @@ class ZoneWait(models.Simulation):
             False,
             staging=staging,
             dist_map=dist_map,
-            customers=customers
+            customers=customers,
         )
 
         self.zoneMap = super().coordinate_zoning(layout, coord_map)
@@ -127,10 +135,12 @@ class ZoneWait(models.Simulation):
                 if not orders_at_node:
                     continue
 
-                pick_duration = len(orders_at_node) * (params.CART_LOAD_TIME + params.HUMAN_PICK_TIME)
+                pick_duration = len(orders_at_node) * (
+                    params.CART_LOAD_TIME + params.HUMAN_PICK_TIME
+                )
                 pick_duration += self.customer_collisions(
-                        node, picker_time, picker_time + pick_duration
-                    )
+                    node, picker_time, picker_time + pick_duration
+                )
 
                 picker_time += pick_duration
 
@@ -158,7 +168,6 @@ class ZoneWait(models.Simulation):
             picker_time += dist_last_to_zone_center / min(
                 params.WALKING_SPEED, params.AMR_SPEED
             )
-
 
             picker.available_time = picker_time
             picker_finish_times[zone_id] = picker_time
@@ -284,7 +293,7 @@ if __name__ == "__main__":
     raw_orders = generate_orders(
         coord_map, params.SIM_TIME, layout, params.order_arrival_rate
     )
-    
+
     orders = [
         models.Order(
             id=raw_order["order_id"],
@@ -305,7 +314,14 @@ if __name__ == "__main__":
     customers = [models.Customer(i, staging) for i in range(params.num_customers)]
 
     sim = ZoneWait(
-        orders, pickers, amrs, coord_map, layout=layout, staging=staging, dist_map=dist_map, customers=customers
+        orders,
+        pickers,
+        amrs,
+        coord_map,
+        layout=layout,
+        staging=staging,
+        dist_map=dist_map,
+        customers=customers,
     )
     sim.coordinate_zoning(layout, coord_map)
     sim.run()

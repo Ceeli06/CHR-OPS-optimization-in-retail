@@ -158,7 +158,6 @@ class Metrics:
             else 0.0
         )
 
-
         spoiled_pct = (
             (self.spoiled_perishables / self.total_perishables) * 100
             if self.total_perishables
@@ -359,7 +358,9 @@ class Simulation:
         if not unique_coords:
             return [self.staging]
 
-        route = get_path(unique_coords, self.dist_map, self.staging,self.map, self.layout)
+        route = get_path(
+            unique_coords, self.dist_map, self.staging, self.map, self.layout
+        )
         if not route or route[-1] != self.staging:
             route.append(self.staging)
 
@@ -592,16 +593,15 @@ class Simulation:
                     start_time = order.pick_start_time
                 else:
                     start_time = order.arrival_time
-                    
+
                 exposure = order.at_staging_time - start_time
                 print("exposure", exposure)
                 print(start_time)
                 print(order.at_staging_time)
                 item_count = self.perishable_item_count(order)
-                
-                
+
                 self.metrics.perishable_exposure.extend([exposure] * item_count)
-            
+
                 self.metrics.total_perishables += item_count
                 if exposure > params.FREEZER_PERISHABLE_TIME:
                     self.metrics.spoiled_perishables += item_count
