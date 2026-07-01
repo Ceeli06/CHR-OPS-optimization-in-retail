@@ -14,7 +14,7 @@ FREEZER_PERISHABLE_TIME = 60 * 60  # 1 hour
 # Orders have between ORDER_DUE_TIME_MIN and ORDER_DUE_TIME_MAX to be fulfilled
 ORDER_DUE_TIME_MIN = 2 * 60 * 60  # 2 hours
 ORDER_DUE_TIME_MAX = 4 * 60 * 60  # 4 hours
-STAGING_TIME = 2 * 60 * 60  # 2 hours
+STAGING_TIME = 3 * 60  # 3 minutes
 WALKING_SPEED = 1.3  # Walking speed in meters per second
 HUMAN_PICK_TIME = 20  # Time to find and manually pick one item at the pick location
 CART_LOAD_TIME = 5  # Seconds to load one item onto the cart/AMR
