@@ -41,6 +41,20 @@ class DeadlineSim(models.Simulation):
         while urgent_orders and len(selected_orders) < batch_size:
             selected_orders.append(urgent_orders.pop(0))
 
+        # Force any non-urgent order that has been waiting too long,
+        # oldest first so a low similarity order doesn't get skipped forever
+        remaining_capacity = batch_size - len(selected_orders)
+        if remaining_capacity > 0:
+            non_urgent_orders.sort(key=lambda o: o.arrival_time)
+            while (
+                non_urgent_orders
+                and remaining_capacity > 0
+                and self.time - non_urgent_orders[0].arrival_time
+                >= params.SIMILARITY_BATCH_MAX_WAIT
+            ):
+                selected_orders.append(non_urgent_orders.pop(0))
+                remaining_capacity -= 1
+
         # If batch is not full, select remaining based on due-time and similarity
         remaining_capacity = batch_size - len(selected_orders)
         if remaining_capacity > 0 and non_urgent_orders:
