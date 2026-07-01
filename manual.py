@@ -18,6 +18,7 @@ class ManualSim(models.Simulation):
 
     # Creates a batch of orders to be completed together. The total batch size depends on BATCH_SIZE_MIN
     # and BATCH_SIZE_MAX constants. Orders are put together into a batch based on their item similarity.
+    # Assigns the passed picker to the batch.
     def create_batch(self, picker, force=False):
         if not self.pending_orders:
             return None

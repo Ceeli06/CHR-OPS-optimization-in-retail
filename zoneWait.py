@@ -128,7 +128,7 @@ class ZoneWait(models.Simulation):
                 if node == self.staging:
                     break
                 walk_dist = self.dist_map[prev_node][node[0], node[1]]
-                walk_time = walk_dist / (min(params.WALKING_SPEED, params.AMR_SPEED))
+                walk_time = walk_dist / (min(params.WALKING_SPEED * params.MANUAL_PUSH_FACTOR, params.AMR_SPEED))
                 picker_time += walk_time
 
                 orders_at_node = coord_orders.get(node, [])

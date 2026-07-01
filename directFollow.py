@@ -11,7 +11,10 @@ from setup_layout import (
 
 # Main DES simulation, where time advances only when events occur (arrivals, dispatches, completions)
 class FollowSim(models.Simulation):
-    # Decides batch size, then returns a batch of that size created via. select_similar_batch
+
+    # Creates a batch of orders to be completed together. The total batch size depends on BATCH_SIZE_MIN
+    # and BATCH_SIZE_MAX constants. Orders are put together into a batch based on their item similarity.
+    # Assigns the passed picker and amr to the batch.
     def create_batch(self, picker, amr, force=False):
         if not self.pending_orders:
             return None
@@ -59,7 +62,7 @@ class FollowSim(models.Simulation):
             return
 
         batch = self.create_batch(picker, amr, force=force)
-        if batch is None:  # Invalid batch-catching
+        if batch is None:  # Checks for invalid batch-catching
             return
 
         picker.mark_busy(self.time)
@@ -155,7 +158,6 @@ class FollowSim(models.Simulation):
                     )
                     time_cursor += swap_wait
                     self.metrics.human_wait_for_amr += swap_wait
-                    # self.metrics.human_idle += swap_wait
                     self.metrics.amr_distance += swap_dist
                     self.metrics.amr_swap_count += 1
 
@@ -174,7 +176,6 @@ class FollowSim(models.Simulation):
             self.metrics.human_wait_for_amr += max(
                 0, amr_travel_time - human_travel_time
             )
-        # self.metrics.human_idle += max(0, amr_travel_time - human_travel_time)
         finish_time = time_cursor
 
         # Update picker available time; whichever AMR is currently active still has to
@@ -205,10 +206,10 @@ class FollowSim(models.Simulation):
 if __name__ == "__main__":
     layout = (
         setup_layout()
-    )  # Medium layout has all 16 departments, used as baseline before layout realism changes
+    )  
     coord_map = map_of_coords(layout)
     dist_map = all_distance_maps(layout)  # Precompute distances for routing
-    staging = coord_map["S"][0]
+    staging = coord_map["S"][0] # Coordinate of staging
 
     # Precompute list of orders
     raw_orders = generate_orders(

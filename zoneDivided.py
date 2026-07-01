@@ -278,7 +278,7 @@ class ZoneDivided(models.Simulation):
 if __name__ == "__main__":
     layout = (
         setup_layout()
-    )  # Medium layout has all 16 departments, used as baseline before layout realism changes
+    )  
     coord_map = map_of_coords(layout)
     dist_map = all_distance_maps(layout)  # Precompute distances for routing
     staging = coord_map["S"][0]
