@@ -176,6 +176,9 @@ class FollowSim(models.Simulation):
             self.metrics.human_wait_for_amr += max(
                 0, amr_travel_time - human_travel_time
             )
+            self.metrics.amr_wait_for_human += max(
+                0, human_travel_time - amr_travel_time
+            )
         finish_time = time_cursor
 
         # Update picker available time; whichever AMR is currently active still has to
