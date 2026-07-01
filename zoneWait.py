@@ -7,8 +7,6 @@ from setup_layout import (
     all_distance_maps,
     path_distance,
 )
-from collections import defaultdict
-import math
 
 
 # Main DES simulation, where time advances only when events occur (arrivals, dispatches, completions)
@@ -282,7 +280,7 @@ class ZoneWait(models.Simulation):
 if __name__ == "__main__":
     layout = (
         setup_layout()
-    )  # Medium layout has all 16 departments, used as baseline before layout realism changes
+    )  
     coord_map = map_of_coords(layout)
     dist_map = all_distance_maps(layout)  # Precompute distances for routing
     staging = coord_map["S"][0]
