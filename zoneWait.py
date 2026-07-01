@@ -193,7 +193,7 @@ class ZoneWait(models.Simulation):
                 # capacity, swap to a replacement before traveling to this zone
                 if (
                     items_carried > 0
-                    and items_carried + zone_items > params.AMR_AND_CART_CAPACITY
+                    and items_carried + zone_items > params.CART_CAPACITY
                 ):
                     return_dist, return_time, unload_time = self.amr_return_leg(
                         current_amr_node, items_carried
@@ -263,13 +263,11 @@ class ZoneWait(models.Simulation):
             active_amr.mark_idle(amr_finish_time)
 
         else:
-            # zone-follow mode or no AMR
             amr_finish_time = max(picker_finish_times.values(), default=self.time)
 
         self.metrics.amr_wait_for_human += amr_wait_time
         self.metrics.human_distance += human_travel_distance
         self.metrics.human_wait_for_amr += human_wait_time
-        self.metrics.human_idle += human_wait_time
         finish_time = max(
             max(picker_finish_times.values(), default=self.time), amr_finish_time
         )

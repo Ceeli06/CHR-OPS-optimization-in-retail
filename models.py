@@ -567,7 +567,7 @@ class Simulation:
     def amr_return_leg(self, from_node, items_carried):
         return_dist = path_distance([from_node, self.staging], self.dist_map)
         return_time = return_dist / params.AMR_SPEED
-        unload_time = params.AMR_AND_CART_UNLOAD_TIME * items_carried
+        unload_time = params.CART_UNLOAD_TIME * items_carried
         return return_dist, return_time, unload_time
 
     # Mark picker idle, record metrics for the completed batch, and schedule the next one if ready

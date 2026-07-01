@@ -117,14 +117,14 @@ class ManualSim(models.Simulation):
                 decrement = sum(1 for coord in order.coords if coord == node)
                 order.items_remaining -= decrement  # Decrement items remaining in batch
             # Checks if cart capacity is exceeded
-            if item_count > params.AMR_AND_CART_CAPACITY:
+            if item_count > params.CART_CAPACITY:
                 # Same human returns back to staging and goes back if the cart capacity is exceeded
                 r, c = self.staging
                 dist_to_staging_and_back = 2 * self.dist_map[prevNode][r, c]
                 picker.distance_walked += dist_to_staging_and_back
                 time_cursor += dist_to_staging_and_back / params.WALKING_SPEED
                 time_cursor += (
-                    params.AMR_AND_CART_UNLOAD_TIME * item_count
+                    params.CART_UNLOAD_TIME * item_count
                 )  # Unload time
                 self.metrics.amr_swap_count += 1
 
@@ -137,7 +137,7 @@ class ManualSim(models.Simulation):
             params.WALKING_SPEED * params.MANUAL_PUSH_FACTOR
         )
         time_cursor += (
-            params.AMR_AND_CART_UNLOAD_TIME * item_count
+            params.CART_UNLOAD_TIME * item_count
         )  # Unloading time @ end (picker must be present)
 
         # Update walking distance of picker and global total

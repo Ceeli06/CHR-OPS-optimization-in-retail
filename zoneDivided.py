@@ -171,9 +171,7 @@ class ZoneDivided(models.Simulation):
             r, c = self.handoffPoints[zone_id]
             dist_last_to_zone_center = self.dist_map[prev_node][r, c]
             picker_time += dist_last_to_zone_center / params.WALKING_SPEED
-            # picker.available_time = picker_time
             picker_finish_times[zone_id] = picker_time
-            # picker.mark_idle(picker_time)
         # times when the order is at the handoff point
         zone_delivery_time = {}
         amr_wait_time = 0.0
@@ -189,7 +187,7 @@ class ZoneDivided(models.Simulation):
                 picker_finish = picker_finish_times[zone_id]
                 zone_item_count = len(batch.zoned_orders[zone_id])
                 num_trips = max(
-                    1, math.ceil(zone_item_count / params.AMR_AND_CART_CAPACITY)
+                    1, math.ceil(zone_item_count / params.CART_CAPACITY)
                 )
 
                 # Split items as evenly as possible across the trips needed to stay under capacity
@@ -216,8 +214,6 @@ class ZoneDivided(models.Simulation):
 
                     if arrival < ready_time:
                         amr_wait_time += ready_time - arrival
-                        # zone_amr.mark_idle(arrival)
-                        # zone_amr.mark_busy(ready_time)
                     else:
                         human_wait_time += arrival - ready_time
 
@@ -229,7 +225,7 @@ class ZoneDivided(models.Simulation):
                     back_dist = path_distance(
                         [self.handoffPoints[zone_id], self.staging], self.dist_map
                     )
-                    unload_time = params.AMR_AND_CART_UNLOAD_TIME * trip_items
+                    unload_time = params.CART_UNLOAD_TIME * trip_items
                     delivery_time = (
                         loaded_time + back_dist / params.AMR_SPEED + unload_time
                     )
@@ -261,7 +257,6 @@ class ZoneDivided(models.Simulation):
         self.metrics.human_distance += human_travel_distance
         self.metrics.amr_distance += amr_distance_total
         self.metrics.human_wait_for_amr += human_wait_time
-        # self.metrics.human_idle += human_wait_time
         # An order isn't complete until every zone it touched has delivered its portion
         for order in batch.orders:
             if order.items_remaining <= 0 and order.at_staging_time is None:

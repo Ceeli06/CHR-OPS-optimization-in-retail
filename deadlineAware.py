@@ -205,7 +205,6 @@ class DeadlineSim(models.Simulation):
         # Calculate human wait time if they beat the robot to the zone
         human_wait = max(0.0, amr_arrival - picker_arrival)
         self.metrics.human_wait_for_amr += human_wait
-        # self.metrics.human_idle += human_wait
 
         # Calculate AMR wait time if it beat the human to the zone
         amr_wait = max(0.0, picker_arrival - amr_arrival)
@@ -294,7 +293,7 @@ class DeadlineSim(models.Simulation):
                 )
                 last_amr_node = node
 
-                if items_carried >= params.AMR_AND_CART_CAPACITY:
+                if items_carried >= params.CART_CAPACITY:
                     # Full AMR heads back to staging to unload (doesn't block the picker)
                     return_dist, return_time, unload_time = self.amr_return_leg(
                         node, items_carried
@@ -317,7 +316,6 @@ class DeadlineSim(models.Simulation):
                     )
                     time_cursor += swap_wait
                     self.metrics.human_wait_for_amr += swap_wait
-                    # self.metrics.human_idle += swap_wait
                     self.metrics.amr_distance += swap_dist
                     self.metrics.amr_swap_count += 1
 

@@ -146,11 +146,6 @@ class ZoneFollow(models.Simulation):
             human_wait_for_amr += max(0, amr_ready - picker_ready)
             picker_time = start_time
 
-            # calculates amr idle time automatically
-            # if amr_wait_time > 0 and amr:
-            #    amr.mark_idle(amr_ready)
-            #    amr.mark_busy(start_time)
-
             picker.mark_busy(start_time)
             prev_node = zonePath[0]
 
@@ -197,7 +192,7 @@ class ZoneFollow(models.Simulation):
                         1 for o in unique_orders.values() for c in o.coords if c == node
                     )
 
-                    if items_carried >= params.AMR_AND_CART_CAPACITY:
+                    if items_carried >= params.CART_CAPACITY:
                         # Full AMR heads back to staging to unload; doesn't block the picker
                         return_dist, return_time, unload_time = self.amr_return_leg(
                             node, items_carried
@@ -244,7 +239,7 @@ class ZoneFollow(models.Simulation):
         travel_dist = path_distance([prev_amr_coord, self.staging], self.dist_map)
 
         amr_finish_time += travel_dist / params.AMR_SPEED
-        amr_finish_time += params.AMR_AND_CART_UNLOAD_TIME * items_carried
+        amr_finish_time += params.CART_UNLOAD_TIME * items_carried
         self.metrics.amr_distance += travel_dist
         amr.available_time = amr_finish_time
         amr.mark_idle(amr_finish_time)
@@ -253,7 +248,6 @@ class ZoneFollow(models.Simulation):
         self.metrics.amr_wait_for_human += amr_wait_for_human
         self.metrics.human_distance += human_travel_distance
         self.metrics.human_wait_for_amr += human_wait_for_amr
-        self.metrics.human_idle += human_wait_for_amr
 
         for order in batch.orders:
             if order.items_remaining <= 0 and order.at_staging_time is None:
