@@ -135,12 +135,12 @@ class FollowSim(models.Simulation):
 
             if amr:
                 items_carried += sum(
-                    1
-                    for order in orders_at_node
-                    for coord in order.coords
-                    if coord == node
+                    sum(1 for coord in order.coords if coord == node)
+                    for order in seen_orders.values()
                 )
-                if items_carried >= params.CART_CAPACITY:
+                if items_carried >= params.CART_CAPACITY and any(
+                    order.items_remaining > 0 for order in batch.orders
+                ):
                     # Full AMR heads back to staging to unload; doesn't block the picker
                     return_dist, return_time, unload_time = self.amr_return_leg(
                         node, items_carried
@@ -182,23 +182,17 @@ class FollowSim(models.Simulation):
             self.metrics.amr_wait_for_human += max(
                 0, human_travel_time - amr_travel_time
             )
-        finish_time = time_cursor
+        finish_time = time_cursor + (items_carried * params.CART_UNLOAD_TIME)
 
         # Update picker available time; whichever AMR is currently active still has to
         # travel back to staging and unload before it's free for its next dispatch
         picker.available_time = finish_time
+        picker.mark_idle(picker.available_time)
         at_staging_time = finish_time
         if amr:
-            return_dist, return_time, unload_time = self.amr_return_leg(
-                prev_node, items_carried
-            )
             amr.distance_traveled += travel_distance
-            amr.available_time = finish_time + unload_time
+            amr.available_time = finish_time 
             amr.mark_idle(amr.available_time)
-            picker.available_time += (
-                unload_time  # picker needs to be present for unloading
-            )
-            at_staging_time = max(finish_time, amr.available_time)
 
         # order is not complete until entire batch is returned to staging and unloaded
         for order in batch.orders:

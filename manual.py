@@ -118,15 +118,16 @@ class ManualSim(models.Simulation):
                 order.items_remaining -= decrement  # Decrement items remaining in batch
             # Checks if cart capacity is exceeded
             item_count += sum(
-                    1
-                    for order in orders_at_node
-                    for coord in order.coords
-                    if coord == node
-                )
-            if item_count > params.CART_CAPACITY:
+                sum(1 for coord in order.coords if coord == node)
+                for order in seen_orders.values()
+            )
+            if item_count >= params.CART_CAPACITY and any(
+                    order.items_remaining > 0 for order in batch.orders
+                ):
                 # Same human returns back to staging and goes back if the cart capacity is exceeded
                 r, c = self.staging
                 dist_to_staging_and_back = 2 * self.dist_map[prevNode][r, c]
+                self.metrics.human_distance += dist_to_staging_and_back
                 picker.distance_walked += dist_to_staging_and_back
                 time_cursor += dist_to_staging_and_back / (params.WALKING_SPEED * params.MANUAL_PUSH_FACTOR) 
                 time_cursor += params.CART_UNLOAD_TIME * item_count  # Unload time
@@ -165,12 +166,12 @@ if __name__ == "__main__":
     coord_map = map_of_coords(layout)
     dist_map = all_distance_maps(layout)  # Precompute distances for routing
     staging = coord_map["S"][0]  # Finds coord of staging
-
+    
     # Precompute list of orders
     raw_orders = generate_orders(
         coord_map, params.SIM_TIME, layout, params.order_arrival_rate
     )
-
+    print(len(raw_orders))
     orders = [
         models.Order(
             id=raw_order["order_id"],

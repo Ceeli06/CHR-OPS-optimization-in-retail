@@ -225,6 +225,7 @@ class Metrics:
         print(f"Throughput: {throughput:.2f} orders/hour")
         print(f"AMR Swap Count: {self.cart_swap_count}")
         print(f"Batch count: {self.batch_completion_count:.2f} batches")
+        print(f"Order completion count: {self.total_orders:.2f} orders")
         print(f"Flush Batch Size: {self.last_batch_size:.2f} orders")
         print(
             f"Completion time for all orders/end of sim: {self.total_time_to_finish/3600:.2f} hours"
@@ -407,6 +408,8 @@ class Simulation:
             if self.time > params.SIM_TIME:
                 if event_type == "PICK_COMPLETE":
                     self.handle_pick_complete(payload)
+                elif event_type == "BATCH_DISPATCH":
+                    self.handle_batch(payload)
                 continue
 
             # If SIM_TIME not exceeded, handle event accordingly

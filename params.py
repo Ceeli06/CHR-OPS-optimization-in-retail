@@ -2,9 +2,9 @@
 
 num_pickers = 4  # default: 4 pickers
 num_robots = 4  # default: 4 AMRs
-num_customers = 30  # Representative of store congestion (default: 30 customers)
+num_customers = 0  # Representative of store congestion (default: 30 customers)
 order_arrival_rate = (
-    1 / 450
+    1 / 50
 )  # Avg. orders per second for arrivalTimeGen's Poisson process (default:1/450sec{8 orders/hour}))
 
 
@@ -37,5 +37,5 @@ URGENCY_THRESHOLD = (
     30 * 60
 )  # Orders with remaining pick times under this threshold are auto-batched
 MANUAL_PUSH_FACTOR = (
-    0.8  # Factor that human walking speed is scaled by when pushing a manual cart
+    0.5  # Factor that human walking speed is scaled by when pushing a manual cart
 )

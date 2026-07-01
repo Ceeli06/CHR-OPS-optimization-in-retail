@@ -286,10 +286,8 @@ class DeadlineSim(models.Simulation):
 
             if amr:
                 items_carried += sum(
-                    1
-                    for order in orders_at_node
-                    for coord in order.coords
-                    if coord == node
+                    sum(1 for coord in order.coords if coord == node)
+                    for order in seen_orders.values()
                 )
                 last_amr_node = node
 
@@ -367,7 +365,7 @@ if __name__ == "__main__":
     raw_orders = generate_orders(
         coord_map, params.SIM_TIME, layout, params.order_arrival_rate
     )
-
+    print("RAW_ORDERS LENGTH:", len(raw_orders))
     orders = [
         models.Order(
             id=raw_order["order_id"],
