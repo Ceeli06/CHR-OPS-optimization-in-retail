@@ -204,12 +204,10 @@ class FollowSim(models.Simulation):
 
 # Main experimentation space where testing occurs
 if __name__ == "__main__":
-    layout = (
-        setup_layout()
-    )  
+    layout = setup_layout()
     coord_map = map_of_coords(layout)
     dist_map = all_distance_maps(layout)  # Precompute distances for routing
-    staging = coord_map["S"][0] # Coordinate of staging
+    staging = coord_map["S"][0]  # Coordinate of staging
 
     # Precompute list of orders
     raw_orders = generate_orders(

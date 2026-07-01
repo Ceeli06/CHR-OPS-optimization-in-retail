@@ -127,7 +127,9 @@ class Metrics:
 
         if final_completion_time > (order.due_time - order.arrival_time):
             self.late_orders += 1
-            self.total_tardy_time += (final_completion_time - (order.due_time - order.arrival_time))
+            self.total_tardy_time += final_completion_time - (
+                order.due_time - order.arrival_time
+            )
 
         self.total_orders += 1
 
@@ -193,7 +195,9 @@ class Metrics:
         print(f"Avg completion time: {avg_completion/60:.2f} min")
         print(f"Late orders: {late_pct:.2f}%")
         print(f"Total tardiness: {self.total_tardy_time/60:.2f} min")
-        print(f"Average tardiness: {self.total_tardy_time/(60 *self.total_orders):.2f} min")
+        print(
+            f"Average tardiness: {self.total_tardy_time/(60 *self.total_orders):.2f} min"
+        )
         print(f"Total picker travel distance: {self.human_distance:.2f} meters")
         print(f"Avg picker travel distance: {avg_picker_distance:.2f} meters")
         print(f"Total picker idle time: {self.human_idle/60:.2f} min")

@@ -173,7 +173,7 @@ class DeadlineSim(models.Simulation):
                 if dist < best_dist:
                     best_dist = dist
                     closest_item_to_staging = coord
-      
+
         meeting_point = closest_item_to_staging
         # Picker travels route starting at current location, while AMR always starts at staging
         picker_to_start_dist = path_distance(
@@ -210,7 +210,7 @@ class DeadlineSim(models.Simulation):
         picking_distance = path_distance(route, self.dist_map)
 
         # Sync baseline before sequential pick durations are added
-        time_cursor = sync_start_time  
+        time_cursor = sync_start_time
 
         # Map each location to the orders that have items there
         coord_orders = {}
@@ -342,9 +342,7 @@ class DeadlineSim(models.Simulation):
 
 # Main experimentation space where testing occurs
 if __name__ == "__main__":
-    layout = (
-        setup_layout()
-    ) 
+    layout = setup_layout()
     coord_map = map_of_coords(layout)
     dist_map = all_distance_maps(layout)  # Precompute distances for routing
     staging = coord_map["S"][0]

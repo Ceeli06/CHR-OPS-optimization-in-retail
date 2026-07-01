@@ -126,7 +126,12 @@ class ZoneWait(models.Simulation):
                 if node == self.staging:
                     break
                 walk_dist = self.dist_map[prev_node][node[0], node[1]]
-                walk_time = walk_dist / (min(params.WALKING_SPEED * params.MANUAL_PUSH_FACTOR, params.AMR_SPEED))
+                walk_time = walk_dist / (
+                    min(
+                        params.WALKING_SPEED * params.MANUAL_PUSH_FACTOR,
+                        params.AMR_SPEED,
+                    )
+                )
                 picker_time += walk_time
 
                 orders_at_node = coord_orders.get(node, [])
@@ -278,9 +283,7 @@ class ZoneWait(models.Simulation):
 
 # Main experimentation space where testing occurs
 if __name__ == "__main__":
-    layout = (
-        setup_layout()
-    )  
+    layout = setup_layout()
     coord_map = map_of_coords(layout)
     dist_map = all_distance_maps(layout)  # Precompute distances for routing
     staging = coord_map["S"][0]

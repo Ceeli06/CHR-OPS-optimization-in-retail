@@ -135,7 +135,9 @@ class ZoneDivided(models.Simulation):
                 if node == self.staging:
                     break
                 walk_dist = self.dist_map[prev_node][node[0], node[1]]
-                walk_time = walk_dist / (params.WALKING_SPEED * params.MANUAL_PUSH_FACTOR)
+                walk_time = walk_dist / (
+                    params.WALKING_SPEED * params.MANUAL_PUSH_FACTOR
+                )
                 picker_time += walk_time
 
                 orders_at_node = coord_orders.get(node, [])
@@ -186,9 +188,7 @@ class ZoneDivided(models.Simulation):
             for zone_id in sorted(route.keys(), key=lambda z: picker_finish_times[z]):
                 picker_finish = picker_finish_times[zone_id]
                 zone_item_count = len(batch.zoned_orders[zone_id])
-                num_trips = max(
-                    1, math.ceil(zone_item_count / params.CART_CAPACITY)
-                )
+                num_trips = max(1, math.ceil(zone_item_count / params.CART_CAPACITY))
 
                 # Split items as evenly as possible across the trips needed to stay under capacity
                 base, extra = divmod(zone_item_count, num_trips)
@@ -271,9 +271,7 @@ class ZoneDivided(models.Simulation):
 
 # Main experimentation space where testing occurs
 if __name__ == "__main__":
-    layout = (
-        setup_layout()
-    )  
+    layout = setup_layout()
     coord_map = map_of_coords(layout)
     dist_map = all_distance_maps(layout)  # Precompute distances for routing
     staging = coord_map["S"][0]

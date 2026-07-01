@@ -133,7 +133,7 @@ class ZoneFollow(models.Simulation):
             dist_to_next_zone = self.dist_map[prev_amr_coord][r, c]
             self.metrics.amr_distance += dist_to_next_zone
             amr_arrival_time = (dist_to_next_zone) / params.AMR_SPEED
-            
+
             if len(zonePath) > 1:
                 prev_amr_coord = zonePath[-2]  # last item
 
@@ -256,9 +256,7 @@ class ZoneFollow(models.Simulation):
 
 # Main experimentation space where testing occurs
 if __name__ == "__main__":
-    layout = (
-        setup_layout()
-    )  
+    layout = setup_layout()
     coord_map = map_of_coords(layout)
     dist_map = all_distance_maps(layout)  # Precompute distances for routing
     staging = coord_map["S"][0]
