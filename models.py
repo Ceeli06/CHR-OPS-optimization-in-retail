@@ -177,6 +177,15 @@ class Metrics:
             self.amr_wait_for_human / params.num_robots if params.num_robots else 0.0
         )
         avg_amr_idle = self.amr_idle / params.num_robots if params.num_robots else 0.0
+        avg_human_wait_for_amr = (
+            self.human_wait_for_amr / params.num_pickers if params.num_pickers else 0.0
+        )
+        avg_amr_distance = (
+            self.amr_distance / params.num_robots if params.num_robots else 0.0
+        )
+        avg_tardiness = (
+            self.total_tardy_time / self.total_orders if self.total_orders else 0.0
+        )
 
         # Stored on self so callers (e.g. simDashboard.py) can read the derived
         # metrics without re-deriving these formulas themselves
@@ -190,6 +199,9 @@ class Metrics:
         self.avg_picker_idle = avg_picker_idle
         self.avg_amr_wait_for_human = avg_amr_wait_for_human
         self.avg_amr_idle = avg_amr_idle
+        self.avg_human_wait_for_amr = avg_human_wait_for_amr
+        self.avg_amr_distance = avg_amr_distance
+        self.avg_tardiness = avg_tardiness
 
         print("\n===== METRICS =====")
         print(f"Avg completion time: {avg_completion/60:.2f} min")

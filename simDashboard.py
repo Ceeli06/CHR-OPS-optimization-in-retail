@@ -3,6 +3,8 @@
 
 import contextlib
 import io
+import math
+import os
 import queue
 import random
 import sys
@@ -156,17 +158,82 @@ DISPLAY_TRANSFORMS = {
     ),
 }
 
+def _bar(key, title, extractor):
+    return {"kind": "bar", "key": key, "title": title, "extractor": extractor}
+
+
+def _stacked(key, title, bottom_extractor, bottom_label, top_extractor, top_label):
+    return {
+        "kind": "stacked",
+        "key": key,
+        "title": title,
+        "bottom_extractor": bottom_extractor,
+        "bottom_label": bottom_label,
+        "top_extractor": top_extractor,
+        "top_label": top_label,
+    }
+
+
+STACKED_BOTTOM_COLOR = "#2b8cbe"  # blue: waiting for the counterpart resource
+STACKED_TOP_COLOR = "#c44e52"  # red: waiting for a task
+
 METRIC_CHARTS = [
-    ("avg_completion", "Avg completion time (min)", lambda m: m.avg_completion / 60),
-    ("throughput", "Throughput (orders/hr)", lambda m: m.throughput),
-    ("late_pct", "Late orders (%)", lambda m: m.late_pct),
-    ("avg_picker_idle", "Avg picker idle (min)", lambda m: m.avg_picker_idle / 60),
-    ("amr_util", "AMR utilization (%)", lambda m: m.amr_util),
-    (
+    # Tier 1: direct outcome measures (throughput / tardiness)
+    _bar("throughput", "Throughput (orders/hr)", lambda m: m.throughput),
+    _bar("late_pct", "Late orders (%)", lambda m: m.late_pct),
+    _bar("avg_tardiness", "Avg tardiness (min)", lambda m: m.avg_tardiness / 60),
+    _bar("avg_completion", "Avg completion time (min)", lambda m: m.avg_completion / 60),
+    # Tier 2: mechanism metrics (explain why throughput/tardiness differ)
+    _bar("amr_util", "AMR utilization (%)", lambda m: m.amr_util),
+    _stacked(
+        "picker_idle_breakdown_avg",
+        "Picker idle - avg per picker (min)",
+        lambda m: m.avg_human_wait_for_amr / 60,
+        "Waiting for AMR",
+        lambda m: max(0.0, m.avg_picker_idle - m.avg_human_wait_for_amr) / 60,
+        "Waiting for task",
+    ),
+    _stacked(
+        "picker_idle_breakdown_total",
+        "Picker idle - total (min)",
+        lambda m: m.human_wait_for_amr / 60,
+        "Waiting for AMR",
+        lambda m: max(0.0, m.human_idle - m.human_wait_for_amr) / 60,
+        "Waiting for task",
+    ),
+    _stacked(
+        "amr_idle_breakdown_avg",
+        "AMR idle - avg per AMR (min)",
+        lambda m: m.avg_amr_wait_for_human / 60,
+        "Waiting for picker",
+        lambda m: max(0.0, m.avg_amr_idle - m.avg_amr_wait_for_human) / 60,
+        "Waiting for task",
+    ),
+    _stacked(
+        "amr_idle_breakdown_total",
+        "AMR idle - total (min)",
+        lambda m: m.amr_wait_for_human / 60,
+        "Waiting for picker",
+        lambda m: max(0.0, m.amr_idle - m.amr_wait_for_human) / 60,
+        "Waiting for task",
+    ),
+    _bar("cart_swap_count", "Cart/AMR swap count", lambda m: m.cart_swap_count),
+    # Tier 3: operational/physical cost (secondary to throughput/tardiness)
+    _bar(
         "avg_picker_distance",
         "Avg picker walk distance (m)",
         lambda m: m.avg_picker_distance,
     ),
+    _bar("avg_amr_distance", "Avg AMR travel distance (m)", lambda m: m.avg_amr_distance),
+    _bar("batch_completion_count", "Batch count", lambda m: m.batch_completion_count),
+    _bar(
+        "total_time_to_finish",
+        "Total time to finish (min)",
+        lambda m: m.total_time_to_finish / 60,
+    ),
+    # Tier 4: tangential to throughput/tardiness (food-safety adjacent)
+    _bar("avg_exposure", "Avg perishable exposure (min)", lambda m: m.avg_exposure / 60),
+    _bar("spoiled_pct", "Spoiled perishables (%)", lambda m: m.spoiled_pct),
 ]
 
 
@@ -339,8 +406,18 @@ class SimDashboard(tk.Tk):
 
         self._build_param_panel()
         self._build_notebook()
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         self.status_var.set("Idle. Adjust parameters and click Re-run All Sims.")
+
+    # Ensures the process actually terminates when the window is closed, even
+    # if a background sim run or a lingering matplotlib/Tk resource would
+    # otherwise keep the interpreter alive (the classic "closed the window but
+    # the terminal is still stuck" symptom).
+    def _on_close(self):
+        plt.close("all")
+        self.destroy()
+        os._exit(0)
 
     # UI stuff
     def _build_param_panel(self):
@@ -380,11 +457,41 @@ class SimDashboard(tk.Tk):
         self._build_log_tab()
 
     def _build_metrics_tab(self):
-        self.metrics_fig, self.metrics_axes = plt.subplots(2, 3, figsize=(11, 6.5))
-        self.metrics_canvas = FigureCanvasTkAgg(
-            self.metrics_fig, master=self.metrics_tab
+        metrics_scroll = tk.Canvas(self.metrics_tab, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(
+            self.metrics_tab, orient=tk.VERTICAL, command=metrics_scroll.yview
         )
-        self.metrics_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        metrics_scroll.configure(yscrollcommand=scrollbar.set)
+        metrics_scroll.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.metrics_scroll = metrics_scroll
+
+        ncols = 3
+        nrows = math.ceil(len(METRIC_CHARTS) / ncols)
+        self.metrics_fig, self.metrics_axes = plt.subplots(
+            nrows, ncols, figsize=(11, 2.3 * nrows)
+        )
+        self.metrics_canvas = FigureCanvasTkAgg(self.metrics_fig, master=metrics_scroll)
+        metrics_widget = self.metrics_canvas.get_tk_widget()
+        metrics_scroll.create_window((0, 0), window=metrics_widget, anchor="nw")
+
+        def _on_widget_configure(event):
+            metrics_scroll.configure(scrollregion=metrics_scroll.bbox("all"))
+
+        metrics_widget.bind("<Configure>", _on_widget_configure)
+
+        def _on_mousewheel(event):
+            metrics_scroll.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        def _bind_mousewheel(event):
+            metrics_scroll.bind_all("<MouseWheel>", _on_mousewheel)
+
+        def _unbind_mousewheel(event):
+            metrics_scroll.unbind_all("<MouseWheel>")
+
+        metrics_scroll.bind("<Enter>", _bind_mousewheel)
+        metrics_scroll.bind("<Leave>", _unbind_mousewheel)
+
         self._render_empty_metrics()
 
     def _build_route_tab(self):
@@ -506,30 +613,67 @@ class SimDashboard(tk.Tk):
         self._render_log_tab()
 
     def _render_empty_metrics(self):
-        for ax in self.metrics_axes.flat:
+        axes = list(self.metrics_axes.flat)
+        for ax, _chart in zip(axes, METRIC_CHARTS):
             ax.clear()
             ax.set_title("(no data yet)")
+        for ax in axes[len(METRIC_CHARTS) :]:
+            ax.axis("off")
+        self.metrics_fig.tight_layout()
         self.metrics_canvas.draw()
+        self.metrics_canvas.get_tk_widget().update_idletasks()
+        self.metrics_scroll.configure(scrollregion=self.metrics_scroll.bbox("all"))
 
     def _render_metrics_tab(self):
         policies = self.last_results["policies"]
         names = list(policies.keys())
         short_names = [n.replace(" ", "\n") for n in names]
 
-        for ax, (key, title, extractor) in zip(self.metrics_axes.flat, METRIC_CHARTS):
+        axes = list(self.metrics_axes.flat)
+        for ax, chart in zip(axes, METRIC_CHARTS):
             ax.clear()
-            values = [extractor(data["metrics"]) for data in policies.values()]
-            colors = [
-                "#4c72b0" if data["uses_amr"] else "#999999"
-                for data in policies.values()
-            ]
-            ax.bar(short_names, values, color=colors)
-            ax.set_title(title, fontsize=9)
+            if chart["kind"] == "stacked":
+                bottom_values = [
+                    chart["bottom_extractor"](data["metrics"])
+                    for data in policies.values()
+                ]
+                top_values = [
+                    chart["top_extractor"](data["metrics"])
+                    for data in policies.values()
+                ]
+                ax.bar(
+                    short_names,
+                    bottom_values,
+                    color=STACKED_BOTTOM_COLOR,
+                    label=chart["bottom_label"],
+                )
+                ax.bar(
+                    short_names,
+                    top_values,
+                    bottom=bottom_values,
+                    color=STACKED_TOP_COLOR,
+                    label=chart["top_label"],
+                )
+                ax.legend(fontsize=6, loc="upper right")
+            else:
+                values = [
+                    chart["extractor"](data["metrics"]) for data in policies.values()
+                ]
+                colors = [
+                    "#4c72b0" if data["uses_amr"] else "#999999"
+                    for data in policies.values()
+                ]
+                ax.bar(short_names, values, color=colors)
+            ax.set_title(chart["title"], fontsize=9)
             ax.tick_params(axis="x", labelsize=7)
             ax.tick_params(axis="y", labelsize=7)
+        for ax in axes[len(METRIC_CHARTS) :]:
+            ax.axis("off")
 
         self.metrics_fig.tight_layout()
         self.metrics_canvas.draw()
+        self.metrics_canvas.get_tk_widget().update_idletasks()
+        self.metrics_scroll.configure(scrollregion=self.metrics_scroll.bbox("all"))
 
     def _on_route_policy_change(self):
         if not self.last_results:
