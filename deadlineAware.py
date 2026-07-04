@@ -260,8 +260,8 @@ class DeadlineSim(models.Simulation):
             pick_duration = len(orders_at_node) * (
                 params.HUMAN_PICK_TIME + params.CART_LOAD_TIME
             )
+            # amr collision with customers
             if amr:
-
                 pick_duration += self.customer_collisions(
                     node, time_cursor, time_cursor + pick_duration
                 )

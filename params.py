@@ -38,3 +38,4 @@ URGENCY_THRESHOLD = (
 MANUAL_PUSH_FACTOR = (
     0.5  # Factor that human walking speed is scaled by when pushing a manual cart
 )
+HUMAN_ADAPTABILITY_FACTOR = 0.5 # Factor that represents how adaptable humans are to disruptions relative to AMRs 

@@ -141,7 +141,8 @@ class ZoneWait(models.Simulation):
                 pick_duration = len(orders_at_node) * (
                     params.CART_LOAD_TIME + params.HUMAN_PICK_TIME
                 )
-                pick_duration += self.customer_collisions(
+                # picker collision with customers 
+                pick_duration += params.HUMAN_ADAPTABILITY_FACTOR * self.customer_collisions(
                     node, picker_time, picker_time + pick_duration
                 )
 

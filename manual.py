@@ -98,6 +98,10 @@ class ManualSim(models.Simulation):
             pick_duration = len(orders_at_node) * (
                 params.HUMAN_PICK_TIME + params.CART_LOAD_TIME
             )
+            # picker collision with customers
+            pick_duration += params.HUMAN_ADAPTABILITY_FACTOR * self.customer_collisions(
+                    node, time_cursor, time_cursor + pick_duration
+            )
 
             if pick_duration > 0:
                 time_cursor += pick_duration  # Update batch time every pick
@@ -188,6 +192,7 @@ if __name__ == "__main__":
 
     pickers = [models.Picker(i, staging) for i in range(params.num_pickers)]
     amrs = [models.AMR(i, staging) for i in range(params.num_robots)]
+    customers = [models.Customer(i, staging) for i in range(params.num_customers)]
 
     sim = ManualSim(
         orders,
@@ -197,5 +202,6 @@ if __name__ == "__main__":
         staging=staging,
         dist_map=dist_map,
         layout=layout,
+        customers=customers,
     )
     sim.run()
