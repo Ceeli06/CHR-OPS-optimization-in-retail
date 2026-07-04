@@ -16,10 +16,9 @@ ORDER_DUE_TIME_MIN = 2 * 60 * 60  # 2 hours
 ORDER_DUE_TIME_MAX = 4 * 60 * 60  # 4 hours
 STAGING_TIME = 5 * 60  # 5 minutes
 WALKING_SPEED = 1.3  # Walking speed in meters per second
-HUMAN_PICK_TIME = 20  # Time to find and manually pick one item at the pick location
-CART_LOAD_TIME = 5  # Seconds to load one item onto the cart/AMR
-# Simulated seconds to unload one item (Reflects reality: unloading totes at 6 items/1 tote/5 seconds)
-CART_UNLOAD_TIME = 0.8
+HUMAN_PICK_TIME = 20  # Time to find and manually pick one item at the pick location (includes barcode scanning and other logistical factors)
+CART_LOAD_TIME = 0.8  # Seconds to load one item onto the cart/AMR
+CART_UNLOAD_TIME = 0.8 # Simulated seconds to unload one item (Reflects reality: unloading totes at 6 items/1 tote/5 seconds)
 CART_CAPACITY = 50  # Maximum AMR and manual cart item capacity per trip
 AMR_SPEED = 1.5  # AMR speed in meters per second
 CUSTOMER_SPEED = 1  # customer speed in meters per second
