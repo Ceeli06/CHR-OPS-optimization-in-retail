@@ -20,7 +20,7 @@ CUSTOMER_COUNTS = [0, 30, 60]
 # Replications per configuration: n = ceil((z * sigma / E)^2) from the pilot
 # study at the worst-case matrix corner (32/hr, 2 pickers, ratio 0.5, 60
 # customers): z = 1.96, sigma_tardiness = 61.6 min, E = 15 min -> n = 65.
-N_SEEDS = 1
+N_SEEDS = 65
 
 # The same seed set is used for every configuration (common random numbers):
 # seed i is "day i" simulated under every condition.

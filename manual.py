@@ -201,7 +201,7 @@ if __name__ == "__main__":
         coord_map,
         staging=staging,
         dist_map=dist_map,
-        layout=layout,
         customers=customers,
+        layout=layout,
     )
     sim.run()

@@ -64,7 +64,7 @@ CONFIG_COLUMNS = ["policy", "pickers", "amr_ratio", "robots", "demand_per_hr", "
 POLICY_BUILDERS = {
     "Manual": lambda o, p, a, c, world: manual.ManualSim(
         o, p, a, world["coord_map"], staging=world["staging"],
-        dist_map=world["dist_map"], layout=world["layout"],
+        dist_map=world["dist_map"], layout=world["layout"], customers=c
     ),
     "Direct Follow": lambda o, p, a, c, world: directFollow.FollowSim(
         o, p, a, world["coord_map"], staging=world["staging"],
