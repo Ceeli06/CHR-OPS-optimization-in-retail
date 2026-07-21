@@ -1,5 +1,7 @@
-# Main dashboard: runs all 6 picking policies with adjustable parameters,
-# compares their metrics, and visualizes a selected policy's routes over the store layout.
+'''
+A visualization dashboard that runs all 6 picking policies with adjustable parameters,
+compares their metrics, and visualizes a selected policy's routes over the store layout.
+'''
 
 import contextlib
 import io

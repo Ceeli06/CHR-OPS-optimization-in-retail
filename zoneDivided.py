@@ -1,8 +1,10 @@
-# Zone-divided policy DES where pickers stay permanently assigned to one zone each and batches
-# are split across zones similar to in zone-based wait-based, but each zone's items are carried
-# to staging by an individual AMR instead of one AMR visiting every zone in sequence. AMRs act like a
-# shared pool and can only be assigned to one zone at a time, so a picker in a zone may have to wait
-# for an AMR to free up. An order isn't complete until every zone its items touched has reached staging.
+'''
+Defines the zone divided policy where pickers stay permanently assigned to one zone each and batches
+are split across zones similar to in zone-based wait-based, but each zone's items are carried
+to staging by an individual AMR instead of one AMR visiting every zone in sequence. AMRs act like a
+shared pool and can only be assigned to one zone at a time, so a picker in a zone may have to wait
+for an AMR to free up. An order isn't complete until every zone its items touched has reached staging.
+'''
 
 import params
 import models
@@ -16,7 +18,7 @@ from setup_layout import (
 from collections import defaultdict
 import math
 
-
+# Main DES simulation, where time advances only when events occur (arrivals, dispatches, completions)
 class ZoneDivided(models.Simulation):
     def __init__(
         self,
@@ -44,6 +46,7 @@ class ZoneDivided(models.Simulation):
         self.zoneMap = super().coordinate_zoning(layout, coord_map)
         self.handoffPoints = super().get_zone_handoff_points(self.zoneMap, layout)
 
+    # Extracts pending orders into a single batch and categorizes items by zone.
     def create_batch(self, pickers, amr, force=False):
         if not self.pending_orders:
             return None
@@ -269,7 +272,7 @@ class ZoneDivided(models.Simulation):
         self.schedule(finish_time, "PICK_COMPLETE", batch)
 
 
-# Main experimentation space where testing occurs
+# Standalone runner for testing the policy independently
 if __name__ == "__main__":
     layout = setup_layout()
     coord_map = map_of_coords(layout)

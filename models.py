@@ -1,3 +1,8 @@
+'''
+Contains definitions for core entity dataclasses (orders, pickers, AMRs, customers, batches),
+a class to hold and track metrics during a simulation run, and the parent class all
+policies inherit from.
+'''
 import params
 import heapq
 from collections import defaultdict
@@ -55,7 +60,7 @@ class AMR:
     location: tuple
     available_time: float = 0.0
     distance_traveled: float = (
-        0.0  # Enables desynchronized routing for deadlineAware scenario
+        0.0  # Enables desynchronized routing for the deadlineAware scenario
     )
     is_idle: bool = True
     idle_start: float = 0.0
@@ -72,7 +77,7 @@ class AMR:
             self.is_idle = True
             self.idle_start = current_time
 
-
+# A customer who browses the store throughout the simulation
 @dataclass
 class Customer:
     id: int
@@ -83,7 +88,7 @@ class Customer:
     available_time: float = 0.0  # when current order is finished
 
 
-# A set of orders grouped together for one picker to handle (6-8 per cart for manual)
+# A set of orders grouped together for one picker to handle
 @dataclass
 class Batch:
     orders: list
@@ -187,7 +192,7 @@ class Metrics:
             self.total_tardy_time / self.total_orders if self.total_orders else 0.0
         )
 
-        # Stored on self so callers (e.g. simDashboard.py) can read the derived
+        # Stored on self so callers (ex. simDashboard.py) can read the derived
         # metrics without re-deriving these formulas themselves
         self.avg_completion = avg_completion
         self.late_pct = late_pct
@@ -368,7 +373,8 @@ class Simulation:
 
         return route
 
-    # build_route for directFollow and manual
+    # An alternate build_route for directFollow and manual where
+    # pickers (and AMRs in direct follow) walk the whole route staging-to-staging
     def build_route_2(self, orders):
         coords = []
         for order in orders:
@@ -386,6 +392,7 @@ class Simulation:
 
         return route
 
+    # Builds zone-segmented routes based on zone handoff points
     def build_zoning_route(self, zoned_orders):
         route = {}
 

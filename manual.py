@@ -1,7 +1,7 @@
-﻿# Discrete-event simulation for a manual (human-only) retail order picking policy.
-# Orders arrive via Poisson process, are batched (6-8 per cart),
-# assigned to a picker, and routed using a greedy nearest-neighbor heuristic algorithm
-
+﻿'''
+Defines the manual (human only) baseline policy. Batches are assigned to a picker 
+who pushes a manual cart to pick the entire batch from staging-to-staging
+'''
 import params
 import models
 from orderGen import generate_orders
@@ -16,9 +16,11 @@ from setup_layout import (
 # Main DES simulation, where time advances only when events occur (arrivals, dispatches, completions)
 class ManualSim(models.Simulation):
 
-    # Creates a batch of orders to be completed together. The total batch size depends on BATCH_SIZE_MIN
-    # and BATCH_SIZE_MAX constants. Orders are put together into a batch based on their item similarity.
-    # Assigns the passed picker to the batch.
+    '''
+    Creates a batch of orders to be completed together. The total batch size depends on BATCH_SIZE_MIN
+    and BATCH_SIZE_MAX constants. Orders are put together into a batch based on their item similarity.
+    Assigns the passed picker to the batch.
+    '''
     def create_batch(self, picker, force=False):
         if not self.pending_orders:
             return None
@@ -30,7 +32,9 @@ class ManualSim(models.Simulation):
 
         return models.Batch(orders=batch_orders, picker_id=picker.id, amr_id=None)
 
-    # Main order handling function which routes a batch, computes pick times, and schedules its completion
+    '''
+    Main order handling function which routes a batch, computes pick times, and schedules its completion
+    '''
     def handle_batch(self, payload):
         final = isinstance(payload, dict) and payload.get("final", False)
         # A timeout event forces a dispatch if the oldest pending order has waited BATCH_TIMEOUT
@@ -160,7 +164,7 @@ class ManualSim(models.Simulation):
         self.schedule(finish_time, "PICK_COMPLETE", batch)
 
 
-# Main experimentation space where testing occurs
+# Standalone runner for testing the policy independently
 if __name__ == "__main__":
     layout = setup_layout()
     coord_map = map_of_coords(layout)

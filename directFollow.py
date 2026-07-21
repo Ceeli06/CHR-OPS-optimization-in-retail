@@ -1,3 +1,7 @@
+'''
+Defines the Direct Follow policy. In this strategy, the AMR and picker travel 
+travel together along a single route starting and ending at staging. 
+'''
 import params
 import models
 from orderGen import generate_orders
@@ -9,13 +13,17 @@ from setup_layout import (
 )
 
 
-# Main DES simulation, where time advances only when events occur (arrivals, dispatches, completions)
+'''
+Main DES simulation, where time advances only when events occur (arrivals, dispatches, completions)
+'''
 class FollowSim(models.Simulation):
 
-    # Creates a batch of orders to be completed together. The total batch size depends on BATCH_SIZE_MIN
-    # and BATCH_SIZE_MAX constants. Orders are put together into a batch based on their item similarity.
-    # Assigns the passed picker and amr to the batch.
     def create_batch(self, picker, amr, force=False):
+        '''
+        Creates a batch of orders to be completed together. The total batch size depends on BATCH_SIZE_MIN
+        and BATCH_SIZE_MAX constants. Orders are put together into a batch based on their item similarity.
+        Assigns the passed picker and amr to the batch.
+        '''
         if not self.pending_orders:
             return None
         if not force and len(self.pending_orders) < params.BATCH_SIZE_MIN:
@@ -30,8 +38,10 @@ class FollowSim(models.Simulation):
         batch = models.Batch(orders=batch_orders, picker_id=picker.id, amr_id=amrId)
         return batch
 
-    # Main order handling function which routes a batch, computes pick times, and schedules its completion
     def handle_batch(self, payload):
+        '''
+        Main order handling function which routes a batch, computes pick times, and schedules its completion
+        '''
         final = isinstance(payload, dict) and payload.get("final", False)
         # A timeout event forces a dispatch if the oldest pending order has waited BATCH_TIMEOUT
         timeout = (
@@ -202,7 +212,7 @@ class FollowSim(models.Simulation):
         self.schedule(at_staging_time, "PICK_COMPLETE", batch)
 
 
-# Main experimentation space where testing occurs
+# Standalone runner for testing the policy independently
 if __name__ == "__main__":
     layout = setup_layout()
     coord_map = map_of_coords(layout)

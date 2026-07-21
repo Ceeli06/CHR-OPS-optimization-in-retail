@@ -1,5 +1,7 @@
-# Main testing-matrix runner: sweeps every configuration in config.py
-
+'''
+Sweeps through every configuration in config.py, outputting the metric averages for
+each configuration into a CSV file found in the results folder.
+'''
 import argparse
 import contextlib
 import csv
@@ -30,6 +32,7 @@ import zoneFollow
 import zoneWait
 import zoneDivided
 
+# Maps metrics to unique columns
 METRIC_COLUMNS = [
     ("throughput", "throughput (orders/hr)", 1),  # dashboard definition
     ("avg_tardiness", "avg_tardiness (min)", 60),
@@ -61,6 +64,7 @@ EXTRA_COLUMNS = ["throughput_eff (orders/hr)", "makespan (min)"]
 VALUE_COLUMNS = [header for _, header, _ in METRIC_COLUMNS] + EXTRA_COLUMNS
 CONFIG_COLUMNS = ["policy", "pickers", "amr_ratio", "robots", "demand_per_hr", "customers"]
 
+# Maps local policy names to their respective simulation file equivilents
 POLICY_BUILDERS = {
     "Manual": lambda o, p, a, c, world: manual.ManualSim(
         o, p, a, world["coord_map"], staging=world["staging"],
@@ -92,6 +96,10 @@ _WORLD = None  # per-process cache of layout/coord_map/dist_map
 
 
 def get_world():
+    '''
+    Caches spatial enviroment data (ex. distance map, coordmap, etc.) so
+    it is not recalculated on every run.
+    '''
     global _WORLD
     if _WORLD is None:
         layout = setup_layout()
@@ -110,7 +118,9 @@ def get_world():
 
 
 def run_one(cfg, seed, world):
-    """Run one policy under one config with one seed, return a metrics row."""
+    '''
+    Run one policy under one config with one seed, returning a metrics row.
+    '''
     params.num_pickers = cfg["pickers"]
     params.num_robots = cfg["robots"]
     params.num_customers = cfg["customers"]
@@ -144,13 +154,14 @@ def run_one(cfg, seed, world):
     with contextlib.redirect_stdout(io.StringIO()):
         sim.run()
 
+    # Extract metrics and change into proper units
     m = sim.metrics
     row = dict(cfg)
     row["seed"] = seed
     for attr, header, divisor in METRIC_COLUMNS:
         row[header] = round(getattr(m, attr) / divisor, 3)
 
-    # Makespan-based throughput, immune to trailing customer events
+    # Compute makespan, which is immune to trailing customer events
     completion_times = [
         o.at_staging_time + params.STAGING_TIME
         for o in sim.orders
@@ -166,12 +177,17 @@ def run_one(cfg, seed, world):
 
 
 def run_config(cfg, seeds):
-    """Worker task: run all seeds for one config; returns list of raw rows."""
+    '''
+    Worker task: run all seeds for one config; returns list of raw rows.
+    '''
     world = get_world()
     return [run_one(cfg, seed, world) for seed in seeds]
 
 
 def build_matrix(args):
+    '''
+    Generates the full Cartesian product of configuration parameters to test.
+    '''
     configs = []
     for policy, pickers, ratio, demand, customers in itertools.product(
         args.policies, args.pickers, args.ratios, args.demands, args.customers
@@ -190,7 +206,10 @@ def build_matrix(args):
 
 
 def summarize(raw_rows, n_seeds):
-    """One summary row per config: mean and std of every metric."""
+    '''
+    Groups individual runs by configuration and computes sample statistics 
+    (mean and standard deviation) for each metric column.
+    '''
     cells = {}
     for row in raw_rows:
         key = tuple(row[c] for c in CONFIG_COLUMNS)
@@ -212,7 +231,9 @@ def summarize(raw_rows, n_seeds):
 
 
 def build_run_name(args):
-    """Descriptive result-file name: date, scope (or custom tag), and n."""
+    '''
+    Build a descriptive result-file name with date, scope, and n.
+    '''
     stamp = time.strftime("%Y-%m-%d_%H%M")
     if args.tag:
         scope = args.tag
@@ -229,7 +250,9 @@ def build_run_name(args):
 
 
 def prune_results(out_dir, keep):
-    """Keep only the newest `keep` runs (raw_/summary_ pairs share a name)."""
+    '''
+    Prune all but the newest `keep` results files.
+    '''
     runs = {}
     for name in os.listdir(out_dir):
         if name.endswith(".csv") and name.startswith(("raw_", "summary_")):
@@ -291,6 +314,8 @@ def main():
 
     raw_rows = []
     start = time.time()
+
+    # Execute runs as a pool to maximize multi-core CPU usage
     with ProcessPoolExecutor(max_workers=args.workers) as pool:
         futures = {pool.submit(run_config, cfg, seeds): cfg for cfg in configs}
         done = 0
@@ -306,12 +331,14 @@ def main():
                     f"({elapsed:.0f}s elapsed, ~{eta:.0f}s left)"
                 )
 
+    # Export individual run results
     raw_fields = CONFIG_COLUMNS + ["seed"] + VALUE_COLUMNS
     with open(raw_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=raw_fields)
         writer.writeheader()
         writer.writerows(raw_rows)
 
+    # Calculate and export experiment statistics
     summary_rows = summarize(raw_rows, len(seeds))
     with open(summary_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=list(summary_rows[0].keys()))

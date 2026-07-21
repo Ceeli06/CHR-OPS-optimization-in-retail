@@ -1,4 +1,6 @@
-# Provides store layout setup, grid-to-coordinate mapping, and routing.
+'''
+Provides store layout setup, grid-to-coordinate mapping, and routing.
+'''
 
 import numpy as np
 from collections import defaultdict, deque
@@ -136,13 +138,15 @@ def path_distance(path, dist_map):
     return total
 
 
+# Sums total travel distance across multiple zone subpaths
 def zone_path_dist(zonePath, dist_map):
     total = 0
     for i in range(len(zonePath)):
         total += path_distance(zonePath[i], dist_map)
     return total
 
-
+# Calculates total transport distance for AMR traveling 
+# from staging, then to each zone handoff point, then back to staging
 def zone_amr_dist(zonePath, dist_map, staging):
     path = [staging]
     for i in zonePath.keys():
@@ -151,7 +155,7 @@ def zone_amr_dist(zonePath, dist_map, staging):
     path.append(staging)
     return path_distance(path, dist_map)
 
-
+# Builds the full picking route, picking perishables last
 def get_path(orders, dist_map, staging, map, layout):
     from orderGen import convert_to_walkable
 

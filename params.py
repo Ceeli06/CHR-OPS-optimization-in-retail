@@ -1,11 +1,13 @@
-"""Parameters"""
+'''Contains all simulation constants and configurable parameters'''
 
+"""Parameters"""
 num_pickers = 4  # default: 4 pickers
 num_robots = 4  # default: 4 AMRs
 num_customers = 30  # Representative of store congestion (default: 30 customers)
 order_arrival_rate = (
     1 / 450
-)  # Avg. orders per second for arrivalTimeGen's Poisson process (default:1/450sec{8 orders/hour}))
+)  # Avg. orders per second for arrivalTimeGen's Poisson process 
+   # (default:1 order/450 sec{8 orders/hour}))
 
 
 """Constants"""

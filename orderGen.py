@@ -1,4 +1,6 @@
-# Provided realistic order generation based on Walmart historical trip data
+'''
+Provides utilities for order generation based on the cleaned dataset from DatasetAnalysis
+'''
 
 import json
 import os
@@ -54,7 +56,7 @@ def generate_order_coords(items, coord_map, layout):
 
     return coords
 
-
+# Takes the coordinates of an item and returns the picking location for that item
 def convert_to_walkable(coord, layout):
     r, c = coord
     rows, cols = layout.shape

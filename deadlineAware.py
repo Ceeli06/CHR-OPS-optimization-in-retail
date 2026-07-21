@@ -1,3 +1,10 @@
+'''
+Defines the Deadline Aware policy, an escort-based policy where orders are 
+prioritized based first on urgency, then due time, then similarity. 
+When a batch is decided, a route is built and an AMR and picker are assigned.
+Then, they meet at the first item, walk the route together, then at the last item,
+the AMR goes back to staging while the picker waits at the last item for its next batch.
+'''
 import params
 import models
 import sys
@@ -11,20 +18,24 @@ from setup_layout import (
 )
 
 
-# Main DES simulation, where time advances only when events occur (arrivals, dispatches, completions)
+'''
+Main DES simulation, where time advances only when events occur (arrivals, dispatches, completions)
+'''
 class DeadlineSim(models.Simulation):
 
-    # Adds orders to batch starting with orders that have reached the URGENCY_THRESHOLD,
-    # then sorting remaining orders by due date and using Jaccard helper to greedily select
-    # remaining orders based on similarity, eturning slected and the remaining orders
     def deadline_aware_batching(self, batch_size):
+        ''' 
+        Adds orders to batch starting with orders that have reached the URGENCY_THRESHOLD,
+        then sorting remaining orders by due date and using Jaccard helper to greedily select
+        remaining orders based on similarity, returning the selected and remaining orders
+        '''
         if not self.pending_orders:
             return [], []
 
         urgent_orders = []
         non_urgent_orders = []
 
-        # Filter orders by URGENCY_THRESHOLD
+        # Filter orders by urgent and non-urgent
         for order in self.pending_orders:
             time_remaining = order.due_time - self.time
             if time_remaining <= params.URGENCY_THRESHOLD:
@@ -37,11 +48,11 @@ class DeadlineSim(models.Simulation):
 
         selected_orders = []
 
-        # Pull as many urgent orders as will fit into the batch capacity
+        # Priority 1: Pull as many urgent orders as will fit into the batch capacity
         while urgent_orders and len(selected_orders) < batch_size:
             selected_orders.append(urgent_orders.pop(0))
 
-        # Force any non-urgent order that has been waiting too long,
+        # Priority 2: Force any non-urgent order that has been waiting too long,
         # oldest first so a low similarity order doesn't get skipped forever
         remaining_capacity = batch_size - len(selected_orders)
         if remaining_capacity > 0:
@@ -55,7 +66,7 @@ class DeadlineSim(models.Simulation):
                 selected_orders.append(non_urgent_orders.pop(0))
                 remaining_capacity -= 1
 
-        # If batch is not full, select remaining based on due-time and similarity
+        # Priority 3: If batch is not full, select remaining based on due-time and similarity
         remaining_capacity = batch_size - len(selected_orders)
         if remaining_capacity > 0 and non_urgent_orders:
             # Sort non_urgent_orders by due time so the closest deadline becomes our seed
@@ -74,7 +85,6 @@ class DeadlineSim(models.Simulation):
                     dept_next = self.department_set(i)
                     total_intersection = total_intersection | dept_next
 
-            # seed_departments = super().department_set(seed_order)
             # If we still have slots, sort the remaining non_urgent orders by similarity and append
             if remaining_capacity > 0 and non_urgent_orders:
                 non_urgent_orders.sort(
@@ -91,8 +101,10 @@ class DeadlineSim(models.Simulation):
         remaining_orders = urgent_orders + non_urgent_orders
         return selected_orders, remaining_orders
 
-    # Decides batch size, then returns a batch of that size created via. deadline_aware_batching
     def create_batch(self, picker, amr, force=False):
+        '''
+        Decides batch size, then returns a batch of that size created via. deadline_aware_batching
+        '''
         if not self.pending_orders:
             return None
         if not force and len(self.pending_orders) < params.BATCH_SIZE_MIN:
@@ -107,8 +119,10 @@ class DeadlineSim(models.Simulation):
         batch = models.Batch(orders=batch_orders, picker_id=picker.id, amr_id=amrId)
         return batch
 
-    # Builds a decoupled route that is not synchronized with another resource (other AMR/Picker)
     def build_decoupled_route(self, orders, start_node):
+        '''
+        Builds a decoupled route that is not synchronized with another resource (other AMR/Picker)
+        '''
         coords = []
         for order in orders:
             coords.extend(order.coords)
@@ -123,8 +137,10 @@ class DeadlineSim(models.Simulation):
         )
         return route[:-1]
 
-    # Main order handling function which routes a batch, computes pick times, and schedules its completion
     def handle_batch(self, payload):
+        '''
+        Main order handling function which routes a batch, computes pick times, and schedules its completion
+        '''
         final = isinstance(payload, dict) and payload.get("final", False)
         # A timeout event forces a dispatch if the oldest pending order has waited BATCH_TIMEOUT
         timeout = (
@@ -354,7 +370,7 @@ class DeadlineSim(models.Simulation):
             self.schedule(time_cursor, "PICK_COMPLETE", batch)
 
 
-# Main experimentation space where testing occurs
+# Standalone runner for testing the policy independently
 if __name__ == "__main__":
     layout = setup_layout()
     coord_map = map_of_coords(layout)

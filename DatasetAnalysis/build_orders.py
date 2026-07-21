@@ -1,3 +1,8 @@
+'''
+Processes raw store scan data by filtering out invalid entries, 
+consolidating item quantities by department for each shopping visit, and exporting 
+the resulting basket profiles into a JSON file for easy access by orderGen.py.
+'''
 import pandas as pd
 import json
 

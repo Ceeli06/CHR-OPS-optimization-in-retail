@@ -1,3 +1,8 @@
+'''
+Maps the higher range of departments in the original dataset (ex. DAIRY, BOYS WEAR, GIRLS WEAR)
+to a set of simpler, high-level departments (ex. Perishable Grocery, Fasion). 
+Outputs a new, mapped CSV of the dataset
+'''
 import pandas as pd
 
 itemType_map = {
@@ -75,7 +80,7 @@ input_path = "OrderDataset(Original).csv"
 output_path = "OrderDataset(Mapped).csv"
 
 df = pd.read_csv(input_path)
-df["MappedDepartment"] = (
+df["MappedDepartment"] = ( 
     df["DepartmentDescription"].map(itemType_map).fillna("Miscellaneous")
 )
 df.to_csv(output_path, index=False)

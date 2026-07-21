@@ -1,3 +1,10 @@
+'''
+Defines the zone wait policy where pickers pick items within their own zone independantly,
+delivering them to the handoff point when finished. AMRs travel from zone to zone waiting
+at handoff points until the picker is done picking, then moving to the next zone, collecting
+the batch from staging to staging.
+'''
+
 import params
 import models
 from orderGen import generate_orders
@@ -36,7 +43,8 @@ class ZoneWait(models.Simulation):
 
         self.zoneMap = super().coordinate_zoning(layout, coord_map)
         self.handoffPoints = super().get_zone_handoff_points(self.zoneMap, layout)
-
+    
+    # Extracts pending orders into a single batch and categorizes items by zone.
     def create_batch(self, pickers, amr, force=False):
         if not self.pending_orders:
             return None
@@ -281,7 +289,7 @@ class ZoneWait(models.Simulation):
         self.schedule(finish_time, "PICK_COMPLETE", batch)
 
 
-# Main experimentation space where testing occurs
+# Standalone runner for testing the policy independently
 if __name__ == "__main__":
     layout = setup_layout()
     coord_map = map_of_coords(layout)
