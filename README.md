@@ -1,11 +1,11 @@
-# Retail DES Framework for the Comparitive Analysis of CHROps Polcies
+# Retail DES Framework for the Comparative Analysis of CHROps Policies
 
-A discrete event simulation framework for online order fulfillment that compares six CHROps (Collaborative Human-Mobile Robot Operations) policies: manual, direct follow, deadline aware, zone follow, zone wait, and zone divided within a retail enviroment. The system models picker and AMR coordination, batching, zoning, and store routing to evaluate performance metrics such as: throughput, order completion times, and order tardiness.
+A discrete event simulation framework for online order fulfillment that compares six CHROps (Collaborative Human-Mobile Robot Operations) policies: manual, direct follow, deadline aware, zone follow, zone wait, and zone divided within a retail environment. The system models picker and AMR coordination, batching, zoning, and store routing to evaluate performance metrics such as: throughput, order completion times, and order tardiness.
 
 Key features include:
 - Multiple policy implementations for direct comparative evaluation
 - Realistic order generation driven by cleaned retail transaction data
-- Detailed performance metrics tracking the behavior of human pickers, AMRs, and the overall system
+- Broad range of performance metrics tracking the behavior of human pickers, AMRs, and the overall system
 - Configurable experiment sweeps with CSV output for analysis
 - Visual analytics dashboard for quick side-by-side policy comparison
 
@@ -40,7 +40,7 @@ Choose one of the three execution modes below:
    ```
    - Opens a GUI to launch and compare policies visually.
 
-2. Run an individual policy script and inspect terminal output (for simgle-scenario, single policy analysis):
+2. Run an individual policy script and inspect terminal output (for single-scenario, single policy analysis):
    ```bash
    python manual.py
    python directFollow.py
